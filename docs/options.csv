@@ -1,0 +1,22 @@
+Section,Option,Default,Needs server part,What it does
+1. General,Enabled,On,No,Master switch for every option; the toggle hotkey flips it.
+1. General,Toggle hotkey,Not bound,No,Turns the whole mod on/off in game.
+1. General,Show on/off message,On,No,Notification when the hotkey is used.
+2. Weapons,Infinite ammo,On,No,Reloads never use anything up: the old magazine goes back into your rig/pockets/backpack refilled (also on a double-tap quick reload); with no spare the gun's own magazine is refilled and reloaded. Loose rounds load without leaving the inventory.
+2. Weapons,Infinite magazine,Off,No,Firing never takes a round out of the magazine; an empty gun is refilled and chambered when idle.
+2. Weapons,Infinite weapon durability,Off,No,Firing never lowers weapon durability or max durability.
+2. Weapons,Weapon reliability,Off,No,No malfunctions and no overheating.
+2. Weapons,Launcher and flare ammo,Off,No,Grenade/rocket launcher and flare rounds are not used up; single-use launchers stay usable.
+"3. Grenades, items and money",Infinite grenades,Off,No,A thrown grenade is replaced by the same type in the same spot and quick slot; the selected grenade stays selected.
+"3. Grenades, items and money",Infinite item usage,Off,No,"Meds, food, drinks, stims and injectors are never used up."
+"3. Grenades, items and money",Infinite key usage,Off,No,Keys and keycards never lose a use (incl. the Labs access card).
+"3. Grenades, items and money",Infinite money (incl. GP coins),Off,Yes (out of raid),"Buy without paying: traders, flea, fees, repairs, insurance, healing, hideout upgrades and scav case. Paid exfils and BTR services refund in raid. Money is never added or removed."
+4. Player,Infinite health (god mode),Off,No,"No damage, bleeding, fractures or death; heals fully when turned on."
+4. Player,Infinite energy and hydration,Off,No,Energy and hydration stay full.
+4. Player,Infinite stamina,Off,No,"Body stamina, arm stamina and breath stay full."
+4. Player,Infinite armor durability,Off,No,"Hits never lower armor, plate or helmet durability; protection is unchanged."
+4. Player,Infinite carry weight,Off,No,"Never overweight: no speed limits, extra drain or inertia from weight."
+4. Player,Infinite raid time,Off,No,The raid timer never ends the raid.
+5. Turrets,Turret ammo,Off,No,An empty turret belt refills right away.
+5. Turrets,Turret magazine,Off,No,Firing a turret never takes a round from its belt.
+6. Hideout,Infinite fuel and filters,Off,Yes,"Generator fuel, water filters and air filters never run down."

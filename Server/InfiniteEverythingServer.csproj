@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!--
+    Infinite Everything - server part (SPT 4.1.x, .NET 10). Infinite money (skips PaymentService charges) and infinite hideout fuel/filters.
+    Built from the universal-modder spt-server-mod template. Installs to SPT_Runtime/user/mods/InfiniteEverything/.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>InfiniteEverythingServer</AssemblyName>
+    <RootNamespace>InfiniteEverythingServer</RootNamespace>
+    <ModName>InfiniteEverything</ModName>
+    <SptPackagePrefix Condition="'$(SptPackagePrefix)' == ''">SPTushonka</SptPackagePrefix>
+    <SptPackageVersion Condition="'$(SptPackageVersion)' == ''">4.1.6</SptPackageVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <SptServerDir Condition="'$(SptServerDir)' == ''">SPT_Runtime</SptServerDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="$(SptPackagePrefix).Common" Version="$(SptPackageVersion)" ExcludeAssets="runtime" />
+    <PackageReference Include="$(SptPackagePrefix).DI" Version="$(SptPackageVersion)" ExcludeAssets="runtime" />
+    <PackageReference Include="$(SptPackagePrefix).Server.Core" Version="$(SptPackageVersion)" ExcludeAssets="runtime" />
+    <PackageReference Include="$(SptPackagePrefix).Reflection" Version="$(SptPackageVersion)" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="dist\**;bin\**;obj\**" />
+    <None Remove="dist\**" />
+  </ItemGroup>
+
+  <Target Name="SptDist" AfterTargets="Build">
+    <PropertyGroup>
+      <SptModDir>$(MSBuildProjectDirectory)\dist\$(SptServerDir)\user\mods\$(ModName)\</SptModDir>
+    </PropertyGroup>
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\dist" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SptModDir)" />
+    <Message Importance="high" Text="SPT mod laid out in $(SptModDir)" />
+  </Target>
+</Project>
