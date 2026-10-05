@@ -21,8 +21,8 @@ namespace InfiniteEverything
     public class Plugin : BaseUnityPlugin
     {
         public const string PluginGuid = "com.trappuss.infiniteeverything";
-        public const string PluginName = "Infinite Everything";
-        public const string PluginVersion = "2.3.0";
+        public const string PluginName = "trappuss-InfiniteEverything"; // Forge rule: "Username-ModName"
+        public const string PluginVersion = "2.4.0";
 
         internal static ManualLogSource Log;
 
@@ -67,6 +67,12 @@ namespace InfiniteEverything
                 () => new ReloadFinishedRefillPatch(),
                 () => new EmptyReloadPatch(),
                 () => new LooseAmmoReloadPatch(),
+                () => new AmmoPackCountPatch(),
+                () => new AmmoPackPickPatch(),
+                () => new NoAmmoInternalMagPatch(),
+                () => new NoAmmoCylinderPatch(),
+                () => new NoAmmoBarrelsPatch(),
+                () => new ChamberLoadPatch(),
                 () => new ShotPatch(),
                 () => new WeaponDurabilityPatch(),
                 () => new NoMalfunctionPatch(),
@@ -167,6 +173,8 @@ namespace InfiniteEverything
             PlayerTicker.Tick();
             StateSync.Tick();
             MoneyRefunds.Tick();
+            ChamberRefunds.Tick();
+            TempRounds.Tick(); // after ChamberRefunds: temporary rounds wait for a pending chamber refund
         }
 
         internal static void Notify(string message)
@@ -202,7 +210,9 @@ namespace InfiniteEverything
                 "or backpack (also on a double-tap quick reload) and is refilled to full; with only empty magazines left, one is " +
                 "filled for the reload; with no spare at all, the gun's own magazine is refilled and reloaded (full animation, " +
                 "nothing added to or removed from your inventory). Loose rounds (shotgun tubes, " +
-                "internal magazines, revolvers, break-action barrels) go into the gun without leaving your inventory.");
+                "internal magazines, revolvers, break-action barrels, single rounds into the chamber) go into the gun without " +
+                "leaving your inventory and always load to full; with no matching rounds on you, temporary ones are used for the " +
+                "reload and removed right after (needs a free rig/pocket spot; tubes/internal magazines are filled directly without one).");
             InfiniteMagazine = Option(weapons, "Infinite magazine (rounds are never used up)", false, 60,
                 "Firing never takes a round out of the magazine, so you never need to reload. A gun that is already empty is " +
                 "refilled and a round chambered as soon as it is idle. Magazine- and tube-fed weapons; not revolver cylinders, " +

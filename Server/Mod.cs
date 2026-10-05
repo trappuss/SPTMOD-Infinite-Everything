@@ -24,16 +24,16 @@ namespace InfiniteEverythingServer;
 
 public sealed record ModMetadata : IModMetadata
 {
-    public string ModGuid { get; init; } = "com.trappuss.infiniteeverything.server";
-    public string Name { get; init; } = "Infinite Everything (server)";
+    public string ModGuid { get; init; } = "com.trappuss.infiniteeverything"; // same GUID as the client plugin (Forge rule)
+    public string Name { get; init; } = "InfiniteEverything"; // letters and numbers only (Forge rule)
     public string Author { get; init; } = "trappuss";
     public List<string>? Contributors { get; init; }
-    public Version Version { get; init; } = new("2.3.0");
+    public Version Version { get; init; } = new("2.4.0");
     public Range SptVersion { get; init; } = new("~4.1.0");
     public bool HasPrepatcher { get; init; } = false;
     public List<string>? Incompatibilities { get; init; }
     public Dictionary<string, Range>? ModDependencies { get; init; }
-    public string? Url { get; init; }
+    public string? Url { get; init; } = "https://github.com/trappuss/SPTMOD-Infinite-Everything";
     public string License { get; init; } = "MIT";
 }
 
@@ -211,7 +211,7 @@ public sealed class InfiniteEverythingLoader(ISptLogger<InfiniteEverythingLoader
         new HideoutDrainPatch("UpdateFuel").Enable();
         new HideoutDrainPatch("UpdateWaterFilters").Enable();
         new HideoutDrainPatch("UpdateAirFilters").Enable();
-        logger.Success("[Infinite Everything] server part 2.3.0 loaded (infinite money + hideout resource patches enabled)");
+        logger.Success("[Infinite Everything] server part 2.4.0 loaded (infinite money + hideout resource patches enabled)");
         return Task.CompletedTask;
     }
 }

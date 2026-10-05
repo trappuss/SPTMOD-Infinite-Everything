@@ -16,7 +16,7 @@ Everything but always ever. A single-player [SPT](https://sp-tarkov.com) mod wit
    - `BepInEx\plugins\InfiniteEverything\InfiniteEverything.dll`
    - `SPT_Runtime\user\mods\InfiniteEverything\InfiniteEverythingServer.dll`
 3. Start the server. It should log `[Infinite Everything] server part <version> loaded`.
-4. Start the game, press **F12** and open **Infinite Everything**.
+4. Start the game, press **F12** and open **trappuss-InfiniteEverything**.
 
 If you used the old **InfiniteAmmo** plugin, remove it first. The two are marked incompatible, so Infinite Everything won't load while it is installed.
 
@@ -28,7 +28,7 @@ The full list is a spreadsheet: [`docs/options.csv`](docs/options.csv) (GitHub s
 
 | Section | Option | Server part |
 |---|---|:-:|
-| Weapons | Infinite ammo: reloads never use up magazines or rounds, including the double-tap quick reload | |
+| Weapons | Infinite ammo: reloads never use up magazines or rounds, including the double-tap quick reload. Shotguns, bolt-actions, revolvers and break-actions load to full, even with no rounds on you | |
 | Weapons | Infinite magazine: rounds never leave the magazine, and an empty gun is refilled | |
 | Weapons | Infinite weapon durability | |
 | Weapons | Weapon reliability: no malfunctions or overheating | |
@@ -87,6 +87,7 @@ You need the .NET 10 SDK and an SPT 4.1.x install. The game DLLs are referenced 
 - **`BUILD_AND_INSTALL.bat`** builds both parts, installs them into your SPT folder and packages `dist\SPTMOD-Infinite-Everything-<version>.zip`. It asks for the SPT folder once and saves it in `build.local.cfg`, which is not committed.
 - **`COLLECT_LOG.bat`** gathers the mod's client and server log lines into `_build\ingame.log`, ready for a bug report.
 - **`publish.bat`** pushes the repo and creates the GitHub release with the zip attached. Run it after the build.
+- **`FORGE_PREP.bat`** checks that the release download link works, helps you get the VirusTotal scan, and opens The Forge with the listing text from [`docs/FORGE_LISTING.md`](docs/FORGE_LISTING.md).
 
 The version lives in one place, `Directory.Build.props`. Also update `Plugin.PluginVersion` and the server `ModMetadata` to match.
 

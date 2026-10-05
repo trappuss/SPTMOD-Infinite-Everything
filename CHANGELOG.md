@@ -1,5 +1,12 @@
 # Infinite Everything changelog
 
+## 2.4.0 (2026-10-05)
+- Fix: Infinite ammo's "no spare magazine / only empty spares" handling threw "Collection was modified" whenever a spare magazine was in the rig or pockets (seen in game on 2.2.2), so empty spares were never refilled. Magazines are now collected first and checked afterwards, like the game does.
+- Loose-round reloads (pump/tube shotguns, bolt-action internal magazines, revolvers, break-action and single-shot guns) now always load to full. Before, a reload only loaded as many rounds as you carried, and a single last round loaded one at a time.
+- Infinite ammo with no matching rounds on you: those reloads still work. Temporary rounds are placed in a free rig/pocket spot for the reload (normal animation) and removed as soon as it ends. Without a free spot, tubes/internal magazines are filled directly.
+- Loading a single round straight into the chamber (R on a gun without a usable magazine) now gives the round back too.
+- Forge metadata: the client plugin is named `trappuss-InfiniteEverything`, the server part uses the same GUID as the client (`com.trappuss.infiniteeverything`) and the name `InfiniteEverything`, and the release zip now carries the MIT license in each mod folder.
+
 ## 2.3.0 (2026-10-04)
 - First public release (GitHub). Release zip extracts straight into the SPT folder.
 - One version for both parts (Directory.Build.props); server part reports 2.3.0.

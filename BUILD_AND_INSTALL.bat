@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions
-rem BUILD_AND_INSTALL.bat v2.0 (Infinite Everything) - builds, installs and packages both parts.
+rem BUILD_AND_INSTALL.bat v2.1 (Infinite Everything) - builds, installs and packages both parts.
 rem Close the game AND the SPT server first. Needs the .NET 10 SDK (dotnet) and an SPT 4.1.x install.
 rem   client plugin -> <game>\BepInEx\plugins\InfiniteEverything\InfiniteEverything.dll
 rem   server part   -> <game>\SPT_Runtime\user\mods\InfiniteEverything\InfiniteEverythingServer.dll (Infinite money, hideout fuel/filters)
@@ -50,6 +50,9 @@ if exist "%HERE%dist\SPT_Runtime" rmdir /S /Q "%HERE%dist\SPT_Runtime"
 del /Q "%HERE%dist\*.zip" 2>nul
 mkdir "%HERE%dist\SPT_Runtime\user\mods\InfiniteEverything"
 copy /Y "%SRVDLL%" "%HERE%dist\SPT_Runtime\user\mods\InfiniteEverything\" >nul
+rem Forge rule: the license goes inside the archive (one copy in each mod folder, nothing loose in the SPT root)
+copy /Y "%HERE%LICENSE" "%HERE%dist\SPT_Runtime\user\mods\InfiniteEverything\LICENSE" >nul
+copy /Y "%HERE%LICENSE" "%HERE%dist\BepInEx\plugins\InfiniteEverything\LICENSE" >nul
 powershell -NoProfile -Command "Compress-Archive -Path '%HERE%dist\BepInEx','%HERE%dist\SPT_Runtime' -DestinationPath '%ZIP%' -Force" >> "%LOG%" 2>&1
 if exist "%ZIP%" ( echo Packaged:  %ZIP% & echo packaged %ZIP%>> "%LOG%" ) else ( echo Packaging FAILED - see %LOG% )
 
@@ -65,7 +68,7 @@ move "%OLD%" "%GAME%\BepInEx\_disabled\InfiniteAmmo_%TS%" >nul && echo Moved to 
 
 :done
 echo.
-echo Start the SPT server (it must show "[Infinite Everything] server part %VER% loaded"), then the game: F12 ^> Infinite Everything.
+echo Start the SPT server (it must show "[Infinite Everything] server part %VER% loaded"), then the game: F12 ^> trappuss-InfiniteEverything.
 pause
 exit /b 0
 

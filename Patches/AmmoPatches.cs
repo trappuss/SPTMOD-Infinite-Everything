@@ -32,6 +32,32 @@ namespace InfiniteEverything.Patches
             return string.IsNullOrEmpty(defAmmo) ? null : defAmmo;
         }
 
+        /// <summary>Launchers and flare guns follow "Launcher and flare ammo", every other gun "Infinite ammo".</summary>
+        internal static bool IsLauncher(Weapon weapon, bool launcherMode)
+        {
+            return launcherMode || weapon is GrenadeLauncher || weapon is EFT.InventoryLogic.RocketLauncher || weapon.IsFlareGun;
+        }
+
+        /// <summary>
+        /// The local player is reloading <paramref name="ammo"/> (their own) into the weapon in their hands and the option
+        /// for that weapon is on. Used for loose-round reloads.
+        /// </summary>
+        internal static bool InfiniteLooseFor(Ammo ammo)
+        {
+            if (ammo == null || !Plugin.Enabled.Value)
+            {
+                return false;
+            }
+
+            Player player = MainPlayer.Get();
+            if (player == null || !ReferenceEquals(ammo.Owner, player.InventoryController) || !(player.HandsController is FirearmController controller) || controller.Item == null)
+            {
+                return false;
+            }
+
+            return IsLauncher(controller.Item, controller.IsInLauncherMode()) ? Plugin.LauncherAmmo.Value : Plugin.InfiniteAmmo.Value;
+        }
+
         /// <summary>True when <paramref name="item"/> is <paramref name="root"/> or sits anywhere inside it.</summary>
         internal static bool IsInside(Item item, Item root)
         {
@@ -131,9 +157,19 @@ namespace InfiniteEverything.Patches
                 }
 
                 Magazine current = weapon.GetCurrentMagazine();
+                // Collect first, check the move afterwards: CheckMoveIgnoringTargetItem simulates a move, which changes the
+                // container being enumerated ("Collection was modified", seen in game in 2.2.2). The game's own
+                // ReloadExternalMagazine does it in this order too.
+                var found = new List<Magazine>();
+                inventory.GetReachableItemsOfTypeNonAlloc(found, (Magazine mag) => !ReferenceEquals(mag, current));
                 var spares = new List<Magazine>();
-                inventory.GetReachableItemsOfTypeNonAlloc(spares, (Magazine mag) =>
-                    !ReferenceEquals(mag, current) && ItemManipulator.CheckMoveIgnoringTargetItem(mag, magazineSlot, inventory).Succeeded);
+                foreach (Magazine mag in found)
+                {
+                    if (ItemManipulator.CheckMoveIgnoringTargetItem(mag, magazineSlot, inventory).Succeeded)
+                    {
+                        spares.Add(mag);
+                    }
+                }
 
                 Magazine pick = null;
                 foreach (Magazine spare in spares)
@@ -203,6 +239,9 @@ namespace InfiniteEverything.Patches
     /// which splits one round off the stack, moves the last round, or merges it. For the local player's ammo going into the
     /// weapon in their hands, the round is put back: the stack count is restored, or a new round of the same type is
     /// placed where the old one was. Launchers and flare guns follow "Launcher and flare ammo", every other gun "Infinite ammo".
+    /// A stack of exactly one round is raised to two for the call, so the game splits a round off instead of moving the
+    /// stack itself: the stack stays in the AmmoPack (AmmoPack.LoadAmmo dequeues a stack only on a move or merge) and
+    /// the reload keeps going. Its count is put back afterwards in every case (finalizer).
     /// </summary>
     public class LooseAmmoReloadPatch : ModulePatch
     {
@@ -213,6 +252,7 @@ namespace InfiniteEverything.Patches
             public int Count;
             public string Tpl;
             public InventoryController Inventory;
+            public bool Bumped;
         }
 
         protected override MethodBase GetTargetMethod()
@@ -263,6 +303,12 @@ namespace InfiniteEverything.Patches
                     Tpl = item.StringTemplateId,
                     Inventory = inventory
                 };
+
+                if (item.StackObjectsCount == 1 && item.Template.StackMaxSize >= 2 && __state.From != null)
+                {
+                    item.StackObjectsCount = 2; // split one off instead of moving the stack (see the summary)
+                    __state.Bumped = true;
+                }
             }
             catch (Exception ex)
             {
@@ -270,10 +316,10 @@ namespace InfiniteEverything.Patches
             }
         }
 
-        [PatchPostfix]
-        private static void Postfix(OperationResult<IItemOperationResult> __result, State __state)
+        [PatchFinalizer]
+        private static void Finalizer(OperationResult<IItemOperationResult> __result, Exception __exception, State __state)
         {
-            if (__state == null || __result.Failed || __state.From == null)
+            if (__state == null || __state.From == null)
             {
                 return;
             }
@@ -283,13 +329,17 @@ namespace InfiniteEverything.Patches
                 Item round = __state.Round;
                 if (round.CurrentAddress != null && round.CurrentAddress.Equals(__state.From))
                 {
-                    int used = __state.Count - round.StackObjectsCount;
-                    if (used > 0)
+                    if (round.StackObjectsCount != __state.Count)
                     {
-                        round.StackObjectsCount += used; // split or transfer: give the round back to the stack
+                        round.StackObjectsCount = __state.Count; // give the round back (and undo the bump)
                         round.RaiseRefreshEvent();
                     }
 
+                    return;
+                }
+
+                if (__exception != null || __result.Failed)
+                {
                     return;
                 }
 
@@ -307,7 +357,7 @@ namespace InfiniteEverything.Patches
             }
             catch (Exception ex)
             {
-                Plugin.Log.LogError($"{nameof(LooseAmmoReloadPatch)} postfix: {ex}");
+                Plugin.Log.LogError($"{nameof(LooseAmmoReloadPatch)} finalizer: {ex}");
             }
         }
     }
