@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    InfiniteEverything - SPT 4.1.x client mod (BepInEx 5). Built from the universal-modder spt-client-mod template (real mode only).
+      dotnet build -c Release -p:TarkovDir="<SPT folder with EscapeFromTarkov.exe>" [-p:DeployToGame=true]
+    Every game/SPT reference is Private=false: nothing from the game is copied into the output.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>InfiniteEverything</AssemblyName>
+    <RootNamespace>InfiniteEverything</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <DebugType>portable</DebugType>
+    <DeployToGame Condition="'$(DeployToGame)' == ''">false</DeployToGame>
+    <TarkovDir Condition="'$(TarkovDir)' == '' and '$(TARKOV_DIR)' != ''">$(TARKOV_DIR)</TarkovDir>
+    <TarkovDir Condition="'$(TarkovDir)' == ''">C:\SPT</TarkovDir>
+    <ManagedDir>$(TarkovDir)\EscapeFromTarkov_Data\Managed</ManagedDir>
+    <BepInExCoreDir>$(TarkovDir)\BepInEx\core</BepInExCoreDir>
+    <SptPluginsDir>$(TarkovDir)\BepInEx\plugins\spt</SptPluginsDir>
+    <DistPluginDir>$(MSBuildProjectDirectory)\dist\BepInEx\plugins\$(AssemblyName)</DistPluginDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="dist\**;obj\**;bin\**;_build\**;Server\**" />
+    <None Remove="dist\**;_build\**;Server\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx" HintPath="$(BepInExCoreDir)\BepInEx.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(BepInExCoreDir)\0Harmony.dll" Private="false" />
+    <Reference Include="spt-reflection" HintPath="$(SptPluginsDir)\spt-reflection.dll" Private="false" />
+    <Reference Include="spt-common" HintPath="$(SptPluginsDir)\spt-common.dll" Private="false" />
+    <Reference Include="Assembly-CSharp" HintPath="$(ManagedDir)\Assembly-CSharp.dll" Private="false" />
+    <Reference Include="Comfort" HintPath="$(ManagedDir)\Comfort.dll" Private="false" />
+    <Reference Include="Comfort.Unity" HintPath="$(ManagedDir)\Comfort.Unity.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(ManagedDir)\UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(ManagedDir)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(ManagedDir)\UnityEngine.InputLegacyModule.dll" Private="false" />
+    <Reference Include="ItemComponent.Types" HintPath="$(ManagedDir)\ItemComponent.Types.dll" Private="false" />
+    <Reference Include="ItemTemplate.Types" HintPath="$(ManagedDir)\ItemTemplate.Types.dll" Private="false" />
+    <!-- Extra game assemblies some Assembly-CSharp types inherit from / implement (avoids CS0012); missing ones only warn. -->
+    <Reference Include="Newtonsoft.Json" HintPath="$(ManagedDir)\Newtonsoft.Json.dll" Private="false" />
+    <Reference Include="Sirenix.Serialization" HintPath="$(ManagedDir)\Sirenix.Serialization.dll" Private="false" />
+    <Reference Include="AnimationSystem.Types" HintPath="$(ManagedDir)\AnimationSystem.Types.dll" Private="false" />
+    <Reference Include="UnityEngine.PhysicsModule" HintPath="$(ManagedDir)\UnityEngine.PhysicsModule.dll" Private="false" />
+    <Reference Include="UnityEngine.IMGUIModule" HintPath="$(ManagedDir)\UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AssetBundleModule" HintPath="$(ManagedDir)\UnityEngine.AssetBundleModule.dll" Private="false" />
+    <Reference Include="$(ManagedDir)\Diz*.dll" Private="false" />
+  </ItemGroup>
+
+  <Target Name="ValidateTarkovDir" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(ManagedDir)\Assembly-CSharp.dll')" Text="Assembly-CSharp.dll not found under '$(ManagedDir)'. Pass -p:TarkovDir=&lt;SPT folder&gt;." />
+    <Error Condition="!Exists('$(SptPluginsDir)\spt-reflection.dll')" Text="spt-reflection.dll not found under '$(SptPluginsDir)'." />
+  </Target>
+
+  <Target Name="StageDist" AfterTargets="Build">
+    <RemoveDir Directories="$(DistPluginDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DistPluginDir)" />
+    <Message Importance="high" Text="Staged $(AssemblyName) -> $(DistPluginDir)" />
+  </Target>
+
+  <Target Name="DeployToGame" AfterTargets="StageDist" Condition="'$(DeployToGame)' == 'true' and Exists('$(TarkovDir)\BepInEx\plugins')">
+    <Copy SourceFiles="$(DistPluginDir)\$(AssemblyName).dll" DestinationFolder="$(TarkovDir)\BepInEx\plugins\$(AssemblyName)" />
+    <Message Importance="high" Text="Deployed $(AssemblyName) -> $(TarkovDir)\BepInEx\plugins\$(AssemblyName)" />
+  </Target>
+</Project>

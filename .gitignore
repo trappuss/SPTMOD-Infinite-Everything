@@ -1,0 +1,11 @@
+bin/
+obj/
+dist/
+_build/
+*.user
+Server/bin/
+Server/obj/
+Server/dist/
+build.local.cfg
+state.json
+.vs/
