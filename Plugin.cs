@@ -22,7 +22,7 @@ namespace InfiniteEverything
     {
         public const string PluginGuid = "com.trappuss.infiniteeverything";
         public const string PluginName = "trappuss-InfiniteEverything"; // Forge rule: "Username-ModName"
-        public const string PluginVersion = "2.4.0";
+        public const string PluginVersion = "2.5.0";
 
         internal static ManualLogSource Log;
 
@@ -31,10 +31,10 @@ namespace InfiniteEverything
         internal static ConfigEntry<bool> ShowToggleMessage;
 
         internal static ConfigEntry<bool> InfiniteAmmo;
+        internal static ConfigEntry<bool> HoldReloadShowAll;
         internal static ConfigEntry<bool> InfiniteMagazine;
         internal static ConfigEntry<bool> InfiniteWeaponDurability;
         internal static ConfigEntry<bool> WeaponReliability;
-        internal static ConfigEntry<bool> LauncherAmmo;
 
         internal static ConfigEntry<bool> InfiniteGrenades;
         internal static ConfigEntry<bool> InfiniteItemUsage;
@@ -64,6 +64,7 @@ namespace InfiniteEverything
             {
                 // weapons
                 () => new ReloadKeepMagazinePatch(),
+                () => new KeepRemovedMagazinePatch(),
                 () => new ReloadFinishedRefillPatch(),
                 () => new EmptyReloadPatch(),
                 () => new LooseAmmoReloadPatch(),
@@ -73,6 +74,12 @@ namespace InfiniteEverything
                 () => new NoAmmoCylinderPatch(),
                 () => new NoAmmoBarrelsPatch(),
                 () => new ChamberLoadPatch(),
+                () => new AmmoSelectorListPatch(),
+                () => new VirtualExaminedPatch(),
+                () => new SwitchMagazinePatch(),
+                () => new RaidEndPatch(),
+                () => new RocketFirePatch(),
+                () => new RocketFireEndPatch(),
                 () => new ShotPatch(),
                 () => new WeaponDurabilityPatch(),
                 () => new NoMalfunctionPatch(),
@@ -175,6 +182,9 @@ namespace InfiniteEverything
             MoneyRefunds.Tick();
             ChamberRefunds.Tick();
             TempRounds.Tick(); // after ChamberRefunds: temporary rounds wait for a pending chamber refund
+            Borrowed.Tick();
+            HoldReload.Tick();
+            ItemModels.Tick();
         }
 
         internal static void Notify(string message)
@@ -212,18 +222,25 @@ namespace InfiniteEverything
                 "nothing added to or removed from your inventory). Loose rounds (shotgun tubes, " +
                 "internal magazines, revolvers, break-action barrels, single rounds into the chamber) go into the gun without " +
                 "leaving your inventory and always load to full; with no matching rounds on you, temporary ones are used for the " +
-                "reload and removed right after (needs a free rig/pocket spot; tubes/internal magazines are filled directly without one).");
+                "reload and removed right after (needs a free rig/pocket spot; tubes/internal magazines are filled directly without one). " +
+                "Grenade launchers (underbarrel and standalone) and flare guns reload the same way. The RShG-2 has no reload in the " +
+                "game: after a shot, R puts a new rocket in the tube.");
+            HoldReloadShowAll = Option(weapons, "Infinite Magazine Options (Hold-R Scroll Menu)", true, 65,
+                "With Infinite ammo on, in a raid, the hold-R reload menu also lists every magazine that fits the gun and every " +
+                "round type it takes, even ones you do not carry (with mods' items too). A magazine you do not own is borrowed: " +
+                "the one in the gun is kept aside (no free space needed), and the borrowed one is returned as soon as it leaves the gun (a reload, " +
+                "unloading it) or at raid end (your own magazine is put back in the gun), so your inventory ends as it started. " +
+                "Whatever you pick is kept: R then reloads that magazine / round type again instead of switching back, also after " +
+                "holstering or switching guns.");
             InfiniteMagazine = Option(weapons, "Infinite magazine (rounds are never used up)", false, 60,
                 "Firing never takes a round out of the magazine, so you never need to reload. A gun that is already empty is " +
-                "refilled and a round chambered as soon as it is idle. Magazine- and tube-fed weapons; not revolver cylinders, " +
-                "grenade launchers or break-action barrels. Turrets have their own option.");
+                "refilled and a round chambered as soon as it is idle. Magazine- and tube-fed weapons, and the RShG-2 (a new rocket " +
+                "after every shot); not revolver cylinders, grenade launchers, flare guns or break-action barrels. Turrets have " +
+                "their own option.");
             InfiniteWeaponDurability = Option(weapons, "Infinite weapon durability", false, 50,
                 "Firing never lowers your weapon's durability or maximum durability.");
             WeaponReliability = Option(weapons, "Weapon reliability (no malfunctions, no overheating)", false, 45,
                 "No jams, misfires, feed or slide malfunctions, and the barrel never heats up (no fire-rate change, slide lock or auto-fire from heat).");
-            LauncherAmmo = Option(weapons, "Launcher and flare ammo", false, 40,
-                "Underbarrel and standalone grenade launchers, rocket launchers and flare guns: loading a round never takes it out " +
-                "of your inventory, and single-use launchers (RShG-2, M72...) stay usable after firing.");
 
             const string items = "3. Grenades, items and money";
             InfiniteGrenades = Option(items, "Infinite grenades", false, 70,

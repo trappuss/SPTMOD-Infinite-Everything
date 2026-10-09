@@ -4,7 +4,7 @@ Everything but always ever. A single-player [SPT](https://sp-tarkov.com) mod wit
 
 | | |
 |---|---|
-| **SPT** | 4.1.x (built against 4.1.6, EFT 0.16.9.40743) |
+| **SPT** | 4.1.x only (built against 4.1.6, EFT 0.16.9.40743). Not for 4.0.x |
 | **Parts** | client plugin (BepInEx) + small server part (needed only for money and hideout fuel) |
 | **Affects** | the local player only, never bots |
 | **License** | MIT |
@@ -22,17 +22,17 @@ If you used the old **InfiniteAmmo** plugin, remove it first. The two are marked
 
 ## Options
 
-**Infinite ammo** is on by default; every other option starts off. Turning any option (or the mod) off undoes it right away.
+**Infinite ammo** and **Infinite Magazine Options (Hold-R Scroll Menu)** are on by default; every other option starts off. Turning any option (or the mod) off undoes it right away.
 
 The full list is a spreadsheet: [`docs/options.csv`](docs/options.csv) (GitHub shows it as a sortable table).
 
 | Section | Option | Server part |
 |---|---|:-:|
-| Weapons | Infinite ammo: reloads never use up magazines or rounds, including the double-tap quick reload. Shotguns, bolt-actions, revolvers and break-actions load to full, even with no rounds on you | |
-| Weapons | Infinite magazine: rounds never leave the magazine, and an empty gun is refilled | |
+| Weapons | Infinite ammo: reloads never use up magazines or rounds, including the double-tap quick reload. Shotguns, bolt-actions, revolvers, break-actions, grenade launchers and flare guns load to full, even with no rounds on you. R re-arms the RShG-2 | |
+| Weapons | Infinite Magazine Options (Hold-R Scroll Menu): pick any compatible magazine or round type, even ones you do not carry (borrowed, inventory unchanged at raid end) | |
+| Weapons | Infinite magazine: rounds never leave the magazine, an empty gun is refilled, and the RShG-2 gets a new rocket after every shot | |
 | Weapons | Infinite weapon durability | |
 | Weapons | Weapon reliability: no malfunctions or overheating | |
-| Weapons | Launcher and flare ammo, including single-use launchers | |
 | Grenades, items, money | Infinite grenades: same type, same slot, stays selected | |
 | Grenades, items, money | Infinite item usage: meds, food, drinks, stims | |
 | Grenades, items, money | Infinite key usage: keys, keycards, Labs card | |

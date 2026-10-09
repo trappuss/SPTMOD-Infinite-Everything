@@ -16,9 +16,9 @@ Use this text and these values when you create the mod and add a version on [The
 
 | Field | Value |
 |---|---|
-| Version | 2.4.0 |
-| SPT version | 4.1.x (`~4.1.0`) |
-| Download link | https://github.com/trappuss/SPTMOD-Infinite-Everything/releases/download/v2.4.0/SPTMOD-Infinite-Everything-2.4.0.zip |
+| Version | 2.5.0 |
+| SPT version | 4.1.x only (`~4.1.0`). Do not tick 4.0.x: 4.0 runs EFT 0.16.9-40087 and a .NET 9 server, this mod is built for EFT 40743 and a .NET 10 server |
+| Download link | https://github.com/trappuss/SPTMOD-Infinite-Everything/releases/download/v2.5.0/SPTMOD-Infinite-Everything-2.5.0.zip |
 | VirusTotal link | Upload this exact zip to VirusTotal and paste the result link. Every version needs a new scan. |
 | Dependencies | None |
 | Changelog | Copy from RELEASE_NOTES.md |
@@ -34,11 +34,12 @@ It only affects you, never bots. It also only works in single-player SPT: it nee
 - **Weapons**
   - **Infinite ammo** (on by default):
     - You still reload, but reloading never costs anything. Your magazine goes back into your rig, pockets or backpack, refilled, even on a double-tap quick reload.
-    - Shotguns, bolt-actions, revolvers and break-actions load to full, even with no rounds on you.
-  - **Infinite magazine**: firing never uses rounds.
+    - Shotguns, bolt-actions, revolvers, break-actions, grenade launchers and flare guns load to full, even with no rounds on you.
+    - R puts a new rocket in an empty RShG-2.
+  - **Infinite Magazine Options (Hold-R Scroll Menu)** (on by default): the hold-R reload menu lists every magazine that fits your gun and every round type it takes, even ones you don't carry. Magazines you don't own are borrowed and given back, and your own magazine is back in the gun at raid end. Whatever you pick sticks for later reloads.
+  - **Infinite magazine**: firing never uses rounds. The RShG-2 gets a new rocket after every shot.
   - **Infinite weapon durability**.
   - **Weapon reliability**: no malfunctions and no overheating.
-  - **Launcher and flare ammo**, including single-use launchers.
 - **Grenades, items and money**
   - **Infinite grenades**: you get the same type back in the same slot, and it stays selected.
   - **Infinite item usage**: meds, food, drinks and stims.
@@ -64,14 +65,14 @@ It only affects you, never bots. It also only works in single-player SPT: it nee
 2. Extract it into your SPT folder, the one that contains `EscapeFromTarkov.exe`. It adds:
    - `BepInEx\plugins\InfiniteEverything\`
    - `SPT_Runtime\user\mods\InfiniteEverything\`
-3. Start the SPT server. The log shows `[Infinite Everything] server part 2.4.0 loaded`.
+3. Start the SPT server. The log shows `[Infinite Everything] server part 2.5.0 loaded`.
 4. Start the game, press **F12** and open **trappuss-InfiniteEverything**.
 
 If you used the old *InfiniteAmmo* plugin, delete its folder first. The two are marked incompatible.
 
 ### Usage
 
-- Every option is off by default except Infinite ammo.
+- Every option is off by default except Infinite ammo and Infinite Magazine Options (Hold-R Scroll Menu).
 - Turning an option, or the whole mod, off undoes it right away.
 - Infinite money and the hideout option need the server part. Without it, those two options do nothing.
 

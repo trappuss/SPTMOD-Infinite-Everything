@@ -28,7 +28,7 @@ public sealed record ModMetadata : IModMetadata
     public string Name { get; init; } = "InfiniteEverything"; // letters and numbers only (Forge rule)
     public string Author { get; init; } = "trappuss";
     public List<string>? Contributors { get; init; }
-    public Version Version { get; init; } = new("2.4.0");
+    public Version Version { get; init; } = new("2.5.0");
     public Range SptVersion { get; init; } = new("~4.1.0");
     public bool HasPrepatcher { get; init; } = false;
     public List<string>? Incompatibilities { get; init; }
@@ -211,7 +211,7 @@ public sealed class InfiniteEverythingLoader(ISptLogger<InfiniteEverythingLoader
         new HideoutDrainPatch("UpdateFuel").Enable();
         new HideoutDrainPatch("UpdateWaterFilters").Enable();
         new HideoutDrainPatch("UpdateAirFilters").Enable();
-        logger.Success("[Infinite Everything] server part 2.4.0 loaded (infinite money + hideout resource patches enabled)");
+        logger.Success("[Infinite Everything] server part 2.5.0 loaded (infinite money + hideout resource patches enabled)");
         return Task.CompletedTask;
     }
 }

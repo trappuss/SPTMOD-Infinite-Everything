@@ -9,3 +9,5 @@ Server/dist/
 build.local.cfg
 state.json
 .vs/
+CLAUDE.md
+.claude/

@@ -2,6 +2,6 @@
   <!-- Single version for the client plugin and the server part (also read by publish.bat and BUILD_AND_INSTALL.bat).
        Keep Plugin.PluginVersion (Plugin.cs) and ModMetadata.Version (Server/Mod.cs) the same. -->
   <PropertyGroup>
-    <Version>2.4.0</Version>
+    <Version>2.5.0</Version>
   </PropertyGroup>
 </Project>

@@ -108,11 +108,97 @@ namespace InfiniteEverything.Patches
         private static readonly List<Entry> Entries = new List<Entry>();
 
         /// <summary>
+        /// Set by <see cref="Provide"/>: the model of the rounds is still loading (see <see cref="ItemModels"/>). The
+        /// caller skips the game's reload; R is pressed again for the player when the model is there.
+        /// </summary>
+        internal static bool Deferred;
+
+        /// <summary>Loads the model, then starts the reload again if the same gun is still in the hands.</summary>
+        internal static void ReloadWhenLoaded(Item item, string tpl, FirearmHandsInputTranslator translator, Weapon weapon, string what)
+        {
+            Action retry = () =>
+            {
+                Player player = MainPlayer.Get();
+                if (player != null && ReferenceEquals(player.HandsController, translator._controller) && ReferenceEquals(translator._controller?.Item, weapon))
+                {
+                    translator.Reload();
+                }
+            };
+
+            if (item != null)
+            {
+                ItemModels.Load(item, retry);
+            }
+            else
+            {
+                ItemModels.Load(tpl, retry);
+            }
+
+            Plugin.Log.LogInfo($"Infinite ammo: loading the model of {item?.StringTemplateId ?? tpl} for the {what}; the reload starts when it is ready.");
+        }
+
+        internal static bool Contains(Item item)
+        {
+            foreach (Entry entry in Entries)
+            {
+                if (ReferenceEquals(entry.Item, item))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// A temporary stack (2 rounds) of <paramref name="tpl"/> in a free rig/pocket spot (backpack if those are full),
+        /// removed once the weapon is idle again. Used for a round type picked in the hold-R menu or remembered for the gun.
+        /// Null when the type cannot be lent (single-round stacks) or there is no space.
+        /// </summary>
+        internal static Ammo ProvideTemplate(InventoryController inventory, string tpl, string what)
+        {
+            if (!(Singleton<ItemFactory>.Instance.CreateItem(inventory.NextId, tpl, null) is Ammo round) || round.Template.StackMaxSize < 2)
+            {
+                return null;
+            }
+
+            round.StackObjectsCount = 2;
+            ItemAddress spot = (ItemAddress)ReloadKeepMagazinePatch.FindSpot(inventory, round, backpack: false)
+                               ?? ReloadKeepMagazinePatch.FindSpot(inventory, round, backpack: true);
+            if (spot == null)
+            {
+                return null;
+            }
+
+            inventory.AddAndRaiseEvents(round, spot);
+            if (round.CurrentAddress == null)
+            {
+                return null;
+            }
+
+            Track(round, inventory);
+            Plugin.Log.LogInfo($"Infinite ammo: temporary {tpl} rounds for the {what} (removed when it ends).");
+            return round;
+        }
+
+        private static void Track(Item round, InventoryController inventory)
+        {
+            Entries.Add(new Entry
+            {
+                Item = round,
+                Inventory = inventory,
+                NotBefore = Time.unscaledTime + 0.25f,
+                Deadline = Time.unscaledTime + 60f
+            });
+        }
+
+        /// <summary>
         /// Gives the player a temporary reachable stack for this reload when none of their reachable rounds pass
         /// <paramref name="accept"/>. Returns false when nothing was needed or nothing could be done.
         /// </summary>
         internal static bool Provide(FirearmHandsInputTranslator translator, Weapon weapon, Predicate<Ammo> accept, string what)
         {
+            Deferred = false;
             Player player = translator._player;
             InventoryController inventory = translator._inventoryController;
             if (player == null || !player.IsYourPlayer || inventory == null || weapon == null)
@@ -120,8 +206,7 @@ namespace InfiniteEverything.Patches
                 return false;
             }
 
-            bool launcherMode = player.HandsController is FirearmController fc && fc.IsInLauncherMode();
-            if (!(AmmoHelper.IsLauncher(weapon, launcherMode) ? Plugin.On(Plugin.LauncherAmmo) : Plugin.On(Plugin.InfiniteAmmo)))
+            if (!Plugin.On(Plugin.InfiniteAmmo))
             {
                 return false;
             }
@@ -145,6 +230,13 @@ namespace InfiniteEverything.Patches
                 return false;
             }
 
+            if (!ItemModels.Ready(round))
+            {
+                Deferred = true;
+                ReloadWhenLoaded(round, null, translator, weapon, what);
+                return false;
+            }
+
             ItemAddress spot = ReloadKeepMagazinePatch.FindSpot(inventory, round, backpack: false);
             if (spot == null)
             {
@@ -157,13 +249,7 @@ namespace InfiniteEverything.Patches
                 return false;
             }
 
-            Entries.Add(new Entry
-            {
-                Item = round,
-                Inventory = inventory,
-                NotBefore = Time.unscaledTime + 0.25f,
-                Deadline = Time.unscaledTime + 60f
-            });
+            Track(round, inventory);
             Plugin.Log.LogInfo($"Infinite ammo: no {round.StringTemplateId} rounds on you, temporary rounds for the {what} (removed when it ends).");
             return true;
         }
@@ -287,6 +373,12 @@ namespace InfiniteEverything.Patches
         {
             try
             {
+                if (PickedRounds.TryReload(__instance, weapon, PickedRounds.Kind.InternalMagazine, false))
+                {
+                    __result = true;
+                    return false; // reloaded with the round type picked in the hold-R menu
+                }
+
                 Magazine magazine = weapon?.GetCurrentMagazine();
                 if (magazine == null || magazine is CylinderMagazine || !weapon.HasChambers)
                 {
@@ -305,6 +397,12 @@ namespace InfiniteEverything.Patches
                 if (TempRounds.Provide(__instance, weapon, accept, "tube/internal magazine reload"))
                 {
                     return true; // the normal reload now finds the temporary rounds
+                }
+
+                if (TempRounds.Deferred)
+                {
+                    __result = true;
+                    return false; // their model is loading: the reload starts when it is ready
                 }
 
                 // No free rig/pocket spot (or a round type that cannot be placed): fill it directly, no animation.
@@ -356,18 +454,29 @@ namespace InfiniteEverything.Patches
         }
 
         [PatchPrefix]
-        private static void Prefix(FirearmHandsInputTranslator __instance, Weapon weapon, bool quickReload)
+        private static bool Prefix(FirearmHandsInputTranslator __instance, Weapon weapon, bool quickReload)
         {
             try
             {
+                if (PickedRounds.TryReload(__instance, weapon, PickedRounds.Kind.Cylinder, quickReload))
+                {
+                    return false;
+                }
+
                 if (!(weapon?.GetCurrentMagazine() is CylinderMagazine cylinder) || (!quickReload && cylinder.Count >= cylinder.MaxCount))
                 {
-                    return;
+                    return true;
                 }
 
                 InventoryController inventory = __instance._inventoryController;
                 Predicate<Ammo> accept = ammo => ammo.StackObjectsCount > 0 && inventory.Examined(ammo) && ammo.CheckAction(null).Succeeded && cylinder.CheckCompatibility(ammo);
-                if (!TempRounds.Provide(__instance, weapon, accept, "cylinder reload") && NoAmmoInternalMagPatch.NoReachableAmmo(__instance, accept) && WantsInfinite(__instance, weapon))
+                bool provided = TempRounds.Provide(__instance, weapon, accept, "cylinder reload");
+                if (TempRounds.Deferred)
+                {
+                    return false; // their model is loading: the reload starts when it is ready
+                }
+
+                if (!provided && NoAmmoInternalMagPatch.NoReachableAmmo(__instance, accept) && WantsInfinite(__instance, weapon))
                 {
                     Plugin.Notify("Infinite ammo: no free rig/pocket space for the reload rounds");
                 }
@@ -376,12 +485,13 @@ namespace InfiniteEverything.Patches
             {
                 Plugin.Log.LogError($"{nameof(NoAmmoCylinderPatch)}: {ex}");
             }
+
+            return true;
         }
 
         internal static bool WantsInfinite(FirearmHandsInputTranslator translator, Weapon weapon)
         {
-            bool launcherMode = translator._player?.HandsController is FirearmController fc && fc.IsInLauncherMode();
-            return AmmoHelper.IsLauncher(weapon, launcherMode) ? Plugin.On(Plugin.LauncherAmmo) : Plugin.On(Plugin.InfiniteAmmo);
+            return Plugin.On(Plugin.InfiniteAmmo);
         }
     }
 
@@ -394,24 +504,44 @@ namespace InfiniteEverything.Patches
         }
 
         [PatchPrefix]
-        private static void Prefix(FirearmHandsInputTranslator __instance, Weapon weapon)
+        private static bool Prefix(FirearmHandsInputTranslator __instance, Weapon weapon)
         {
             try
             {
+                if (weapon is EFT.InventoryLogic.RocketLauncher && RocketRearm.Wanted && __instance._player != null && __instance._player.IsYourPlayer)
+                {
+                    // The game's barrel reload never ends on the RShG-2 (seen in game with a rocket in the rig: stuck
+                    // hands, and the loaded rocket moved to the inventory). R is handled here instead: an empty tube
+                    // gets a new rocket, a loaded one nothing.
+                    RocketRearm.Reload(__instance, weapon);
+                    return false;
+                }
+
+                if (PickedRounds.TryReload(__instance, weapon, PickedRounds.Kind.Barrels, false))
+                {
+                    return false;
+                }
+
                 if (weapon == null || !weapon.HasChambers || (weapon.IsMultiBarrel && weapon.FreeChamberSlotsCount == 0))
                 {
-                    return;
+                    return true;
                 }
 
                 Slot chamber = weapon.IsMultiBarrel ? weapon.FirstFreeChamberSlot : weapon.Chambers[0];
                 if (chamber == null || (chamber.ContainedItem is Ammo loaded && !loaded.IsUsed))
                 {
-                    return; // already loaded
+                    return true; // already loaded
                 }
 
                 InventoryController inventory = __instance._inventoryController;
                 Predicate<Ammo> accept = ammo => ammo.StackObjectsCount > 0 && chamber.CanAccept(ammo) && inventory.Examined(ammo) && ammo.CheckAction(null).Succeeded;
-                if (!TempRounds.Provide(__instance, weapon, accept, "barrel reload") && NoAmmoInternalMagPatch.NoReachableAmmo(__instance, accept) && NoAmmoCylinderPatch.WantsInfinite(__instance, weapon))
+                bool provided = TempRounds.Provide(__instance, weapon, accept, "barrel reload");
+                if (TempRounds.Deferred)
+                {
+                    return false; // their model is loading: the reload starts when it is ready
+                }
+
+                if (!provided && NoAmmoInternalMagPatch.NoReachableAmmo(__instance, accept) && NoAmmoCylinderPatch.WantsInfinite(__instance, weapon))
                 {
                     Plugin.Notify("Infinite ammo: no free rig/pocket space for the reload rounds");
                 }
@@ -420,6 +550,135 @@ namespace InfiniteEverything.Patches
             {
                 Plugin.Log.LogError($"{nameof(NoAmmoBarrelsPatch)}: {ex}");
             }
+
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// R after a round type was picked in the hold-R menu for this gun (Prefs): reload with that type again, from your own
+    /// rounds of that type if you carry some, else from temporary ones, instead of whatever the game finds first.
+    /// Same reload calls the game's SwitchMagazine makes. Returns false (game's normal R) when nothing applies.
+    /// </summary>
+    internal static class PickedRounds
+    {
+        internal enum Kind
+        {
+            InternalMagazine,
+            Cylinder,
+            Barrels
+        }
+
+        internal static bool TryReload(FirearmHandsInputTranslator translator, Weapon weapon, Kind kind, bool quickReload)
+        {
+            string tpl = weapon == null ? null : Prefs.PickedRound(weapon);
+            Player player = translator._player;
+            InventoryController inventory = translator._inventoryController;
+            IFirearmHandsController controller = translator._controller;
+            if (tpl == null || player == null || !player.IsYourPlayer || inventory == null || controller == null)
+            {
+                return false;
+            }
+
+            if (!Plugin.On(Plugin.InfiniteAmmo) || weapon.MalfState.State != Weapon.EMalfunctionState.None || !weapon.HasChambers)
+            {
+                return false;
+            }
+
+            if (!(Singleton<ItemFactory>.Instance.CreateItem(inventory.NextId, tpl, null) is Ammo probe))
+            {
+                return false;
+            }
+
+            Magazine magazine = weapon.GetCurrentMagazine();
+            Slot barrel = null;
+            switch (kind)
+            {
+                case Kind.InternalMagazine:
+                    if (magazine == null || magazine is CylinderMagazine || !weapon.Chambers[0].CanAccept(probe)
+                        || (magazine.Count >= magazine.MaxCount && weapon.ChamberAmmoCount > 0))
+                    {
+                        return false;
+                    }
+
+                    break;
+                case Kind.Cylinder:
+                    if (!(magazine is CylinderMagazine cylinder) || !cylinder.CheckCompatibility(probe) || (!quickReload && cylinder.Count >= cylinder.MaxCount))
+                    {
+                        return false;
+                    }
+
+                    break;
+                default:
+                    if (weapon.IsMultiBarrel && weapon.FreeChamberSlotsCount == 0)
+                    {
+                        return false;
+                    }
+
+                    barrel = weapon.IsMultiBarrel ? weapon.FirstFreeChamberSlot : weapon.Chambers[0];
+                    if (barrel == null || !barrel.CanAccept(probe))
+                    {
+                        return false;
+                    }
+
+                    if (barrel.ContainedItem is Ammo inBarrel && !inBarrel.IsUsed && inBarrel.StringTemplateId == tpl)
+                    {
+                        // Already loaded with that type: nothing to do. The game's ReloadBarrels has no "loaded" check
+                        // for a single barrel and would swap the round for whatever type it finds first.
+                        return true;
+                    }
+
+                    break;
+            }
+
+            if (!controller.CanStartReload())
+            {
+                return false;
+            }
+
+            var own = new List<Ammo>();
+            inventory.GetReachableItemsOfTypeNonAlloc(own, ammo => ammo.StackObjectsCount > 0 && ammo.StringTemplateId == tpl && ammo.CheckAction(null).Succeeded);
+            if (own.Count == 0 && !ItemModels.Ready(probe))
+            {
+                TempRounds.ReloadWhenLoaded(probe, null, translator, weapon, "picked round type");
+                return true; // handled: the reload starts when the model is ready
+            }
+
+            Ammo rounds = own.Count > 0 ? own[0] : TempRounds.ProvideTemplate(inventory, tpl, "picked round type");
+            if (rounds == null)
+            {
+                return false;
+            }
+
+            var pack = new AmmoPack(new List<Ammo> { rounds });
+            switch (kind)
+            {
+                case Kind.InternalMagazine:
+                    controller.ReloadWithAmmo(pack, null);
+                    break;
+                case Kind.Cylinder:
+                    controller.ReloadCylinderMagazine(pack, null, quickReload);
+                    break;
+                default:
+                    ItemAddress place = null;
+                    if (barrel.ContainedItem is Ammo old && !old.IsUsed)
+                    {
+                        place = (ItemAddress)ReloadKeepMagazinePatch.FindSpot(inventory, old, backpack: false)
+                                ?? ReloadKeepMagazinePatch.FindSpot(inventory, old, backpack: true);
+                        if (place == null)
+                        {
+                            // Without a place ReloadSingleBarrelResult.Run removes the loaded round and throws it on the ground.
+                            Plugin.Notify("Infinite ammo: no free space to keep the loaded round");
+                            return true;
+                        }
+                    }
+
+                    controller.ReloadBarrels(pack, place, null);
+                    break;
+            }
+
+            Plugin.Log.LogInfo($"Infinite ammo: R reloads the picked round type {tpl}.");
+            return true;
         }
     }
 
