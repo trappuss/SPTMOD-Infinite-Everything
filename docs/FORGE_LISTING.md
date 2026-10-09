@@ -21,7 +21,7 @@ Use this text and these values when you create the mod and add a version on [The
 | Download link | https://github.com/trappuss/SPTMOD-Infinite-Everything/releases/download/v2.5.0/SPTMOD-Infinite-Everything-2.5.0.zip |
 | VirusTotal link | Upload this exact zip to VirusTotal and paste the result link. Every version needs a new scan. |
 | Dependencies | None |
-| Changelog | Copy from RELEASE_NOTES.md |
+| Changelog | Copy from RELEASE_NOTES.md: everything from the first bold heading down to, but not including, "In the zip" |
 
 ## Description (paste as-is)
 
@@ -34,9 +34,11 @@ It only affects you, never bots. It also only works in single-player SPT: it nee
 - **Weapons**
   - **Infinite ammo** (on by default):
     - You still reload, but reloading never costs anything. Your magazine goes back into your rig, pockets or backpack, refilled, even on a double-tap quick reload.
+    - R and double-tap R always reload, also on a full gun and with only the magazine that is in the gun.
+    - Nothing is dropped when your inventory is full: the old magazine is kept aside and comes back when there is room.
     - Shotguns, bolt-actions, revolvers, break-actions, grenade launchers and flare guns load to full, even with no rounds on you.
     - R puts a new rocket in an empty RShG-2.
-  - **Infinite Magazine Options (Hold-R Scroll Menu)** (on by default): the hold-R reload menu lists every magazine that fits your gun and every round type it takes, even ones you don't carry. Magazines you don't own are borrowed and given back, and your own magazine is back in the gun at raid end. Whatever you pick sticks for later reloads.
+  - **Infinite Magazine Options (Hold-R Scroll Menu)** (on by default): the hold-R reload menu lists every magazine that fits your gun and every round type it takes, even ones you don't carry. Magazines you don't own are borrowed, and that needs no free inventory space: your own magazine is kept aside, comes back when the borrowed one leaves the gun, and is back in the gun at raid end. Whatever you pick sticks for later reloads.
   - **Infinite magazine**: firing never uses rounds. The RShG-2 gets a new rocket after every shot.
   - **Infinite weapon durability**.
   - **Weapon reliability**: no malfunctions and no overheating.

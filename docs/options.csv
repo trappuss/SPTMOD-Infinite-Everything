@@ -3,7 +3,7 @@ Section,Option,Default,Needs server part,What it does
 1. General,Toggle hotkey,Not bound,No,Turns the whole mod on/off in game.
 1. General,Show on/off message,On,No,Notification when the hotkey is used.
 2. Weapons,Infinite ammo,On,No,"Reloads never use anything up: the old magazine goes back into your rig/pockets/backpack refilled (also on a double-tap quick reload); with no spare the gun's own magazine is refilled and reloaded. Loose-round guns (tubes, internal magazines, revolvers, break-action, chamber loading, grenade launchers, flare guns) load to full without using rounds, even with none on you. R puts a new rocket in an empty RShG-2."
-2. Weapons,Infinite Magazine Options (Hold-R Scroll Menu),On,No,"With Infinite ammo on, the hold-R reload menu lists every magazine that fits and every round type the gun takes. Magazines you do not own are borrowed and returned as soon as they leave the gun (inventory unchanged at raid end). Your pick sticks for later reloads."
+2. Weapons,Infinite Magazine Options (Hold-R Scroll Menu),On,No,"With Infinite ammo on, the hold-R reload menu lists every magazine that fits and every round type the gun takes. Magazines you do not own are borrowed with no free inventory space needed and returned as soon as they leave the gun (inventory unchanged at raid end). Your pick sticks for later reloads."
 2. Weapons,Infinite magazine,Off,No,Firing never takes a round out of the magazine; an empty gun is refilled and chambered when idle. The RShG-2 gets a new rocket after every shot.
 2. Weapons,Infinite weapon durability,Off,No,Firing never lowers weapon durability or max durability.
 2. Weapons,Weapon reliability,Off,No,No malfunctions and no overheating.

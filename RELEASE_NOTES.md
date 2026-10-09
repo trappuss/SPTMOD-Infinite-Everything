@@ -12,6 +12,7 @@ For SPT 4.1.x (not 4.0.x). Extract the zip into your SPT folder (the one with `E
 - "Launcher and flare ammo" is gone as a separate option. Grenade launchers and flare guns now follow **Infinite ammo**.
 - RShG-2: with **Infinite magazine** it gets a new rocket after every shot. With **Infinite ammo** alone, press R after a shot to put a new rocket in.
 - Double-tap R plays the fast reload also when the gun only has the magazine that is in it.
+- R now reloads a gun that is already full, as the base game does when you have a spare magazine.
 - A reload with a completely full inventory no longer throws the old magazine on the ground: it is kept aside and comes back when there is room.
 
 **Fixes**
