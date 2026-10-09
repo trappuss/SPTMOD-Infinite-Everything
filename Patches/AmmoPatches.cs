@@ -119,6 +119,63 @@ namespace InfiniteEverything.Patches
     }
 
     /// <summary>
+    /// Raids only: lets ReloadExternalMagResult.Run move the gun's own magazine out to a free spot and straight back in
+    /// (EmptyReloadPatch.SelfReload). The raid's search controller (ActiveSearchController) refuses to take an item out
+    /// of a rig, backpack or pocket grid unless it "knows" it there, and it only learns that from the events of the
+    /// move that put it there (AddResult.RaiseEvents). Run makes both moves before any event, so the second one failed
+    /// with UnknownItemError and the reload silently did not start: seen in the 2.5.0 raid test, while the hideout,
+    /// where everything is known (FullySearchedSearchController), was fine. The game bridges the same gap with a
+    /// temporary mark at the start of every move; the magazine gets that mark for the length of the reload call.
+    /// </summary>
+    internal static class KnownForReload
+    {
+        private static Item _item;
+        private static ActiveSearchController _search;
+        private static float _until;
+
+        internal static void Mark(InventoryController inventory, Item item)
+        {
+            Clear();
+            if (!(inventory.SearchController is ActiveSearchController search) || search._temporaryKnownItems.Contains(item))
+            {
+                return; // the hideout, or the game has marked it itself: nothing of ours to take back later
+            }
+
+            search.SetItemAsTemporaryKnown(item);
+            _item = item;
+            _search = search;
+            _until = UnityEngine.Time.unscaledTime + 10f;
+        }
+
+        internal static void Clear()
+        {
+            if (_item == null)
+            {
+                return;
+            }
+
+            _search.RemoveItemFromTemporaryKnown(_item);
+            _item = null;
+            _search = null;
+        }
+
+        /// <summary>A reload queued behind a shot runs when the shot ends; the mark goes once the hands are idle again. Called every frame.</summary>
+        internal static void Tick()
+        {
+            if (_item == null)
+            {
+                return;
+            }
+
+            Player player = MainPlayer.Get();
+            if (player == null || UnityEngine.Time.unscaledTime > _until || HoldReload.HandsIdle(player))
+            {
+                Clear();
+            }
+        }
+    }
+
+    /// <summary>
     /// Infinite ammo with nothing left to load. R / double-tap R go through FirearmHandsInputTranslator.ReloadExternalMagazine,
     /// which only picks magazines with Count > 0 from the rig/pockets (GetReachableItemsOfTypeNonAlloc) and otherwise shows
     /// "no magazine". Before that search, with Infinite ammo on:
@@ -312,7 +369,8 @@ namespace InfiniteEverything.Patches
 
         /// <summary>
         /// Fills the gun's own magazine and reloads it with the game's animation: the normal reload moves it out to a
-        /// free spot and back in, in one step; a double-tap, or no free spot, uses <see cref="TwinReload"/>.
+        /// free spot and back in, in one step (<see cref="KnownForReload"/> makes that possible in a raid); a double-tap,
+        /// no free spot, or a reload the game still refuses, uses <see cref="TwinReload"/>.
         /// Returns the prefix result: false when handled.
         /// </summary>
         private static bool SelfReload(FirearmController controller, InventoryController inventory, Weapon weapon, Magazine current, string tpl, bool quickReload, ref bool __result, string why)
@@ -331,13 +389,42 @@ namespace InfiniteEverything.Patches
                                ?? ReloadKeepMagazinePatch.FindSpot(inventory, current, backpack: true);
             if (controller != null && spot != null && controller.CanStartReload())
             {
-                controller.ReloadMag(current, spot, null);
-                Plugin.Log.LogInfo($"Infinite ammo: {why}, reloading the gun's own {current} (+{added} rounds).");
-                __result = true;
-                return false;
+                // From idle the game runs the reload inside this call; during a shot it queues it for when the shot ends.
+                bool idle = controller.CurrentOperation is FirearmController.Idling;
+                string refused = null;
+                bool returned = false;
+                KnownForReload.Mark(inventory, current);
+                controller.ReloadMag(current, spot, result =>
+                {
+                    if (result.Failed)
+                    {
+                        refused = result.Error ?? "refused";
+                        if (returned)
+                        {
+                            // queued behind a shot and refused when its turn came; the magazine is refilled all the same
+                            Plugin.Log.LogWarning($"Infinite ammo: the reload of the gun's own magazine ended or was refused later ({refused}).");
+                        }
+                    }
+                });
+                returned = true;
+
+                bool started = refused == null && (!idle || !(controller.CurrentOperation is FirearmController.Idling));
+                if (idle || !started)
+                {
+                    KnownForReload.Clear(); // a queued reload keeps the mark until it has run (KnownForReload.Tick)
+                }
+
+                if (started)
+                {
+                    Plugin.Log.LogInfo($"Infinite ammo: {why}, {(idle ? "reloading" : "queued a reload of")} the gun's own {current} (+{added} rounds).");
+                    __result = true;
+                    return false;
+                }
+
+                Plugin.Log.LogWarning($"Infinite ammo: the reload of the gun's own {current} did not start ({refused ?? "no reason given"}); trying a borrowed twin.");
             }
 
-            if (spot == null && TwinReload(controller, inventory, weapon, current, tpl, quick: false, picked))
+            if (TwinReload(controller, inventory, weapon, current, tpl, quick: false, picked))
             {
                 __result = true;
                 return false;
@@ -466,7 +553,7 @@ namespace InfiniteEverything.Patches
                 replacement.StackObjectsCount = 1;
                 if (ItemManipulator.Add(replacement, __state.From, __state.Inventory, simulate: true).Succeeded)
                 {
-                    __state.Inventory.AddAndRaiseEvents(replacement, __state.From);
+                    NotLoot.Add(__state.Inventory, replacement, __state.From);
                 }
                 else
                 {

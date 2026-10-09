@@ -163,6 +163,7 @@ namespace InfiniteEverything.Patches
         {
             Item money = Singleton<ItemFactory>.Instance.CreateItem(inventory.NextId, stack.Tpl, null);
             money.StackObjectsCount = stack.Count; // the same size the stack had a moment ago
+            money.SpawnedInSession = stack.Item.SpawnedInSession;
 
             ItemAddress target = stack.Address;
             if (!ItemManipulator.Add(money, target, inventory, simulate: true).Succeeded)
@@ -178,7 +179,7 @@ namespace InfiniteEverything.Patches
                 return false;
             }
 
-            inventory.AddAndRaiseEvents(money, target);
+            NotLoot.Add(inventory, money, target);
             return money.CurrentAddress != null;
         }
     }
@@ -213,9 +214,11 @@ namespace InfiniteEverything.Patches
         }
 
         [PatchPostfix]
-        private static void Postfix(Player player, List<MoneyRefunds.Stack> __state)
+        private static void Postfix(Player player, bool __result, List<MoneyRefunds.Stack> __state)
         {
-            if (__state != null)
+            // False: no payment was started (no room in the exfil's stash, or not enough money). Without this the
+            // stack was watched for a minute anyway and moving it by hand was taken for the payment: a second stack.
+            if (__state != null && __result)
             {
                 MoneyRefunds.Add("paid exfil", player.InventoryController, __state, null);
             }

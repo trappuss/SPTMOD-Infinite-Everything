@@ -1,5 +1,19 @@
 # Infinite Everything changelog
 
+## 2.5.1 (2026-10-09)
+Fixes found by testing 2.5.0 in raids and by a full review of what the game does in a raid that it does not do in the hideout.
+- Fix: in a raid, R with no spare magazine (or with a magazine picked in the hold-R menu) refilled the magazine but played no reload whenever the magazine had a free cell to go to, which is every pistol. The game only moves items it "knows" in a raid, and the out-and-back move of the gun's own magazine was refused. Double-tap was not affected. If the game still refuses, a borrowed twin is used and the log says why.
+- Fix: looting experience was paid for every item the mod creates: 5 per borrowed or twin magazine (every double-tap) and, since earlier versions, 5 per replacement grenade. Created items are now registered like the gear you bring in. Borrowed magazines also no longer give a Mag Drills skill tick or leave an entry in the profile.
+- Fix: Infinite energy and hydration paid raid experience and Metabolism skill, about 6 experience a minute, because the game rewards every refill. The drain is now stopped instead of being refilled.
+- Fix: the game keeps input on for about a second after a raid ends and saves the profile right after. A reload in that second could save a borrowed magazine in the gun and lose your own, or leave temporary rounds in the profile. Clean-up now runs at both ends of that second and nothing is borrowed in between.
+- Fix: unloading a gun that holds a borrowed magazine with no free space threw the borrowed magazine on the ground and could leave the hands stuck. That unload is now refused with a notice.
+- Fix: loose-round guns (tubes, revolvers, break-actions) loaded with a round type you have not examined got the wrong rounds or none in a raid.
+- Fix: the hold-R menu no longer lists magazines the game refuses to change in a raid, and a refused pick is cancelled at once with a notice.
+- Fix: R with a picked round type is no longer swallowed when the game refuses the reload.
+- Fix: paid exfil refund could duplicate the money stack when the payment did not start and the stack was moved by hand.
+- Fix: replacement grenades and refunded money keep their found-in-raid status; the quick-slot key survives a G-key quick throw; turning god mode off after a BTR ride no longer leaves you invincible.
+- At raid end a magazine that was kept aside tries every free place before giving up.
+
 ## 2.5.0 (2026-10-08)
 - New: hold-R reload menu lists every magazine that fits the gun and every round type it takes (mods' items too), not only what you carry (Infinite ammo on, in a raid; option "Infinite Magazine Options (Hold-R Scroll Menu)", on by default). Internal-magazine, revolver, break-action and underbarrel guns list round types.
 - A magazine you do not own is borrowed, and borrowing needs no free inventory space: your own magazine is kept aside (out of the inventory) while the borrowed one is in the gun. The borrowed one is removed as soon as it leaves the gun (a reload swaps it out, the unload key, dragging it out by hand) and your own magazine comes back; at raid end it is put back in the gun, so the inventory ends exactly as it started. A picked round type uses temporary rounds that are removed after the reload.

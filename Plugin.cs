@@ -22,7 +22,7 @@ namespace InfiniteEverything
     {
         public const string PluginGuid = "com.trappuss.infiniteeverything";
         public const string PluginName = "trappuss-InfiniteEverything"; // Forge rule: "Username-ModName"
-        public const string PluginVersion = "2.5.0";
+        public const string PluginVersion = "2.5.1";
 
         internal static ManualLogSource Log;
 
@@ -77,7 +77,9 @@ namespace InfiniteEverything
                 () => new AmmoSelectorListPatch(),
                 () => new VirtualExaminedPatch(),
                 () => new SwitchMagazinePatch(),
+                () => new UnloadBorrowedPatch(),
                 () => new RaidEndPatch(),
+                () => new RaidSavePatch(),
                 () => new RocketFirePatch(),
                 () => new RocketFireEndPatch(),
                 () => new ShotPatch(),
@@ -96,6 +98,8 @@ namespace InfiniteEverything
                 () => new LabsKeycardPatch(),
                 // player
                 () => new KillPatch(),
+                () => new EnergyDrainPatch(),
+                () => new HydrationDrainPatch(),
                 () => new StaminaProcessPatch(),
                 () => new StaminaConsumePatch(),
                 () => new ArmorDurabilityPatch(),
@@ -183,6 +187,8 @@ namespace InfiniteEverything
             ChamberRefunds.Tick();
             TempRounds.Tick(); // after ChamberRefunds: temporary rounds wait for a pending chamber refund
             Borrowed.Tick();
+            KnownForReload.Tick();
+            Rebind.Tick();
             HoldReload.Tick();
             ItemModels.Tick();
         }

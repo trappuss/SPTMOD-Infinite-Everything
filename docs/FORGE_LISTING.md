@@ -12,24 +12,27 @@ The description and the changelog use only headings, paragraphs and one-level li
 | GUID | `com.trappuss.infiniteeverything` (the same in the client plugin and the server part) |
 | License | MIT |
 | Source code | https://github.com/trappuss/SPTMOD-Infinite-Everything |
-| Teaser | 18 switchable "infinite" options for SPT, all in F12: ammo, magazines, grenades, meds, keys, money, health, stamina, turrets, hideout fuel and more. Money is never added or removed. |
+| Teaser | 18 switchable "infinite" options for SPT 4.1.x, all in F12: ammo, magazines, grenades, meds, keys, money, health, stamina, turrets, hideout fuel and more. Money is never added or removed. |
 
 ## Version (entered for every release)
 
 | Field | Value |
 |---|---|
-| Version | 2.5.0 |
+| Version | 2.5.1 |
 | SPT version | 4.1.x only (`~4.1.0`). Do not tick 4.0.x: 4.0 runs EFT 0.16.9-40087 and a .NET 9 server, this mod is built for EFT 40743 and a .NET 10 server |
-| Download link | https://github.com/trappuss/SPTMOD-Infinite-Everything/releases/download/v2.5.0/SPTMOD-Infinite-Everything-2.5.0.zip |
+| Check after saving | The version must show 4.1.x only. Version 2.4.0 was listed as compatible with 4.0.x as well and users asked about 4.0.13: edit that version and set the same constraint |
+| Download link | https://github.com/trappuss/SPTMOD-Infinite-Everything/releases/download/v2.5.1/SPTMOD-Infinite-Everything-2.5.1.zip |
 | VirusTotal link | Upload this exact zip to VirusTotal and paste the result link. Every version needs a new scan. |
 | Dependencies | None |
-| Changelog | Copy from RELEASE_NOTES.md: everything from the "New" heading down to, but not including, "In the zip" |
+| Changelog | Copy from RELEASE_NOTES.md: everything from the first heading after the intro ("New" or "Fixed") down to, but not including, "In the zip" |
 
 ## Description (paste everything below this line)
 
 **Infinite Everything** gives you 18 "infinite" options that you switch on and off separately in the F12 menu. They all work together. One master hotkey turns the whole mod on or off; it is **not bound by default**.
 
 It only affects you, never bots. It only works in single-player SPT: it needs the SPT client and server, and it can't do anything in live Tarkov.
+
+**Requires SPT 4.1.x.** It does not work on SPT 4.0.x (4.0.13 included): 4.0 runs an older game version and a different server, and the mod will not load there.
 
 ## Options
 
@@ -86,7 +89,7 @@ Infinite money is non-destructive: no money is ever added to or removed from you
 
 1. Download the zip.
 2. Extract it into your SPT folder, the one that contains `EscapeFromTarkov.exe`.
-3. Start the SPT server. The log shows `[Infinite Everything] server part 2.5.0 loaded`.
+3. Start the SPT server. The log shows `[Infinite Everything] server part 2.5.1 loaded`.
 4. Start the game, press **F12** and open **trappuss-InfiniteEverything**.
 
 The zip adds two folders: `BepInEx\plugins\InfiniteEverything\` and `SPT_Runtime\user\mods\InfiniteEverything\`.

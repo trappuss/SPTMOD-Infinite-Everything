@@ -137,8 +137,16 @@ namespace InfiniteEverything.Patches
             Plugin.Log.LogInfo($"Infinite ammo: loading the model of {item?.StringTemplateId ?? tpl} for the {what}; the reload starts when it is ready.");
         }
 
+        /// <summary>A round being tried in <see cref="CreateRound"/>: it counts as examined like the tracked ones (VirtualExaminedPatch).</summary>
+        private static Item _probe;
+
         internal static bool Contains(Item item)
         {
+            if (item != null && ReferenceEquals(_probe, item))
+            {
+                return true;
+            }
+
             foreach (Entry entry in Entries)
             {
                 if (ReferenceEquals(entry.Item, item))
@@ -157,7 +165,7 @@ namespace InfiniteEverything.Patches
         /// </summary>
         internal static Ammo ProvideTemplate(InventoryController inventory, string tpl, string what)
         {
-            if (!(Singleton<ItemFactory>.Instance.CreateItem(inventory.NextId, tpl, null) is Ammo round) || round.Template.StackMaxSize < 2)
+            if (HoldReload.RaidEnding || !(Singleton<ItemFactory>.Instance.CreateItem(inventory.NextId, tpl, null) is Ammo round) || round.Template.StackMaxSize < 2)
             {
                 return null;
             }
@@ -170,7 +178,7 @@ namespace InfiniteEverything.Patches
                 return null;
             }
 
-            inventory.AddAndRaiseEvents(round, spot);
+            NotLoot.Add(inventory, round, spot);
             if (round.CurrentAddress == null)
             {
                 return null;
@@ -206,7 +214,7 @@ namespace InfiniteEverything.Patches
                 return false;
             }
 
-            if (!Plugin.On(Plugin.InfiniteAmmo))
+            if (!Plugin.On(Plugin.InfiniteAmmo) || HoldReload.RaidEnding)
             {
                 return false;
             }
@@ -243,7 +251,7 @@ namespace InfiniteEverything.Patches
                 return false;
             }
 
-            inventory.AddAndRaiseEvents(round, spot);
+            NotLoot.Add(inventory, round, spot);
             if (round.CurrentAddress == null)
             {
                 return false;
@@ -294,8 +302,22 @@ namespace InfiniteEverything.Patches
                     continue;
                 }
 
+                // "accept" asks the inventory whether the round is examined. In a raid that is the profile's
+                // encyclopedia (33 of the 208 round types are not examined by default), and a gun loaded with such
+                // rounds got the default ammo or nothing. The hideout counts everything as examined and hid it.
                 ammo.StackObjectsCount = Math.Min(2, Math.Max(1, ammo.Template.StackMaxSize));
-                if (ammo.StackObjectsCount >= 2 && accept(ammo))
+                bool accepted;
+                _probe = ammo;
+                try
+                {
+                    accepted = ammo.StackObjectsCount >= 2 && accept(ammo);
+                }
+                finally
+                {
+                    _probe = null;
+                }
+
+                if (accepted)
                 {
                     return ammo;
                 }
@@ -333,29 +355,59 @@ namespace InfiniteEverything.Patches
                     continue;
                 }
 
-                Entries.RemoveAt(i);
-                try
+                if (TryRemove(entry, force: false))
                 {
-                    Item item = entry.Item;
-                    if (item.CurrentAddress == null || !ReferenceEquals(item.Owner, entry.Inventory) || item.Parent?.Container?.ParentItem is Weapon)
-                    {
-                        continue; // already gone
-                    }
-
-                    OperationResult<RemoveResult> result = ItemManipulator.Remove(item, entry.Inventory);
-                    if (result.Failed)
-                    {
-                        Plugin.Log.LogWarning($"Infinite ammo: could not remove the temporary rounds ({result.Error}).");
-                        continue;
-                    }
-
-                    result.Value.RaiseEvents(entry.Inventory, CommandStatus.Begin);
-                    result.Value.RaiseEvents(entry.Inventory, CommandStatus.Succeed);
+                    Entries.RemoveAt(i);
                 }
-                catch (Exception ex)
+                else
                 {
-                    Plugin.Log.LogError($"Infinite ammo: removing temporary rounds failed: {ex}");
+                    entry.NotBefore = Time.unscaledTime + 2f; // it stays tracked: tried again, and forced at raid end
                 }
+            }
+        }
+
+        /// <summary>Raid end, before the profile is saved: every temporary stack still in the inventory goes, whatever the hands are doing.</summary>
+        internal static void RaidEnd()
+        {
+            for (int i = Entries.Count - 1; i >= 0; i--)
+            {
+                TryRemove(Entries[i], force: true);
+            }
+
+            Entries.Clear();
+        }
+
+        /// <summary>True: the stack is out of the inventory (removed now, or it was already gone).</summary>
+        private static bool TryRemove(Entry entry, bool force)
+        {
+            try
+            {
+                Item item = entry.Item;
+                if (item.CurrentAddress == null || !ReferenceEquals(item.Owner, entry.Inventory) || item.Parent?.Container?.ParentItem is Weapon)
+                {
+                    return true; // already gone
+                }
+
+                OperationResult<RemoveResult> result = ItemManipulator.Remove(item, entry.Inventory);
+                if (result.Failed && force)
+                {
+                    result = ItemManipulator.RemoveWithoutRestrictions(item, entry.Inventory);
+                }
+
+                if (result.Failed)
+                {
+                    Plugin.Log.LogWarning($"Infinite ammo: could not remove the temporary rounds ({result.Error}).");
+                    return false;
+                }
+
+                result.Value.RaiseEvents(entry.Inventory, CommandStatus.Begin);
+                result.Value.RaiseEvents(entry.Inventory, CommandStatus.Succeed);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogError($"Infinite ammo: removing temporary rounds failed: {ex}");
+                return false;
             }
         }
     }
@@ -651,13 +703,21 @@ namespace InfiniteEverything.Patches
             }
 
             var pack = new AmmoPack(new List<Ammo> { rounds });
+            bool idle = (controller as FirearmController)?.CurrentOperation is FirearmController.Idling;
+            Callback refused = result =>
+            {
+                if (result.Failed)
+                {
+                    Plugin.Log.LogWarning($"Infinite ammo: the reload with the picked round type {tpl} was refused ({result.Error}).");
+                }
+            };
             switch (kind)
             {
                 case Kind.InternalMagazine:
-                    controller.ReloadWithAmmo(pack, null);
+                    controller.ReloadWithAmmo(pack, refused);
                     break;
                 case Kind.Cylinder:
-                    controller.ReloadCylinderMagazine(pack, null, quickReload);
+                    controller.ReloadCylinderMagazine(pack, refused, quickReload);
                     break;
                 default:
                     ItemAddress place = null;
@@ -673,8 +733,15 @@ namespace InfiniteEverything.Patches
                         }
                     }
 
-                    controller.ReloadBarrels(pack, place, null);
+                    controller.ReloadBarrels(pack, place, refused);
                     break;
+            }
+
+            if (idle && (controller as FirearmController)?.CurrentOperation is FirearmController.Idling)
+            {
+                // From idle the game starts the reload inside the call. It did not: the game's own reload gets this R.
+                Plugin.Log.LogWarning($"Infinite ammo: the reload with the picked round type {tpl} did not start.");
+                return false;
             }
 
             Plugin.Log.LogInfo($"Infinite ammo: R reloads the picked round type {tpl}.");
@@ -853,7 +920,7 @@ namespace InfiniteEverything.Patches
                 return;
             }
 
-            inventory.AddAndRaiseEvents(round, target);
+            NotLoot.Add(inventory, round, target);
             Plugin.Log.LogInfo("Infinite ammo: chambered round given back.");
         }
     }

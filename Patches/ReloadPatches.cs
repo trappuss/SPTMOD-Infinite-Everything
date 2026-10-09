@@ -105,6 +105,13 @@ namespace InfiniteEverything.Patches
                     continue;
                 }
 
+                // In a raid the game refuses a move into a container it has not searched (UnknownAddressError), and a
+                // reload given such a place for the old magazine is refused without a word.
+                if (!ItemManipulator.CanTransferTo(address, inventory, out _))
+                {
+                    continue;
+                }
+
                 int area = grid.GridWidth * grid.GridHeight;
                 if (area < bestArea)
                 {

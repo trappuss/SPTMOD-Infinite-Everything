@@ -18,6 +18,76 @@ namespace InfiniteEverything.Patches
     /// The live grenade keeps a reference to the thrown item, so instead of keeping that item we put a NEW grenade of the
     /// same template where the old one was (or any free spot) and re-bind the quick slot it had.
     /// </summary>
+    /// <summary>
+    /// The quick-slot key of a thrown grenade goes to its replacement. During a quick throw (key G) the hands controller
+    /// is QuickGrenadeThrowHandsController, whose CanExecute is always false, so the game throws the bind operation away
+    /// without a word; the bind waits here until those hands are gone. Called every frame.
+    /// </summary>
+    internal static class Rebind
+    {
+        private sealed class Entry
+        {
+            public InventoryController Inventory;
+            public Item Item;
+            public EBoundItem Key;
+            public float Deadline;
+        }
+
+        private static readonly List<Entry> Pending = new List<Entry>();
+
+        internal static void Add(InventoryController inventory, Item item, EBoundItem key)
+        {
+            Pending.Add(new Entry { Inventory = inventory, Item = item, Key = key, Deadline = UnityEngine.Time.unscaledTime + 10f });
+            Tick();
+        }
+
+        internal static void Tick()
+        {
+            if (Pending.Count == 0)
+            {
+                return;
+            }
+
+            Player player = MainPlayer.Get();
+            if (player == null)
+            {
+                Pending.Clear();
+                return;
+            }
+
+            if (player.HandsController is Player.QuickGrenadeThrowHandsController && UnityEngine.Time.unscaledTime < Pending[0].Deadline)
+            {
+                return;
+            }
+
+            foreach (Entry entry in Pending)
+            {
+                try
+                {
+                    if (entry.Item.CurrentAddress == null || !ReferenceEquals(entry.Item.Owner, entry.Inventory))
+                    {
+                        continue; // thrown or moved away in the meantime
+                    }
+
+                    var bind = BindResult.Run(entry.Inventory, entry.Item, entry.Key, simulate: true);
+                    if (bind.Failed)
+                    {
+                        Plugin.Log.LogInfo($"Infinite grenades: the new grenade could not take the quick slot back ({bind.Error}).");
+                        continue;
+                    }
+
+                    entry.Inventory.TryRunNetworkTransaction(bind);
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.LogError($"Infinite grenades: quick slot not restored: {ex}");
+                }
+            }
+
+            Pending.Clear();
+        }
+    }
+
     public class GrenadeThrowPatch : ModulePatch
     {
         internal sealed class ThrowState
@@ -135,6 +205,7 @@ namespace InfiniteEverything.Patches
             {
                 InventoryController inventory = __state.Inventory;
                 Item replacement = Singleton<ItemFactory>.Instance.CreateItem(inventory.NextId, __state.Grenade.StringTemplateId, null);
+                replacement.SpawnedInSession = __state.Grenade.SpawnedInSession; // found-in-raid stays found-in-raid
 
                 ItemAddress target = __state.Address;
                 if (!ItemManipulator.Add(replacement, target, inventory, simulate: true).Succeeded)
@@ -150,7 +221,7 @@ namespace InfiniteEverything.Patches
                     return;
                 }
 
-                inventory.AddAndRaiseEvents(replacement, target);
+                NotLoot.Add(inventory, replacement, target);
                 if (replacement.CurrentAddress == null)
                 {
                     Plugin.Log.LogWarning("Infinite grenades: adding the replacement grenade failed (see the error above).");
@@ -159,7 +230,7 @@ namespace InfiniteEverything.Patches
 
                 if (__state.Binding.HasValue)
                 {
-                    inventory.TryRunNetworkTransaction(BindResult.Run(inventory, replacement, __state.Binding.Value, simulate: true));
+                    Rebind.Add(inventory, replacement, __state.Binding.Value);
                 }
 
                 if (__state.WasSelected && replacement is ThrowWeap newGrenade)

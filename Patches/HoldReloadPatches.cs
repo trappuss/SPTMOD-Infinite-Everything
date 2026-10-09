@@ -45,10 +45,17 @@ namespace InfiniteEverything.Patches
         /// </summary>
         internal static bool InHideout => MainPlayer.Get() is HideoutPlayer;
 
+        /// <summary>
+        /// The raid is being stopped. BaseLocalGame.Stop only starts a one-second fade to black; input stays on until
+        /// the fade ends, and the profile is saved right after it (GameEnd). Nothing is borrowed or lent any more in
+        /// that second, and RaidEndPatch cleans up at both ends of it. Cleared when the world is gone (Tick).
+        /// </summary>
+        internal static bool RaidEnding;
+
         /// <summary>The option that applies to <paramref name="weapon"/> is on, for the local player, in a raid or the hideout.</summary>
         internal static bool Active(InventoryController controller, Weapon weapon)
         {
-            if (weapon == null || !(InRaid || InHideout) || !Plugin.Enabled.Value || !Plugin.HoldReloadShowAll.Value || MainPlayer.InventoryIfMine(controller) == null)
+            if (weapon == null || RaidEnding || !(InRaid || InHideout) || !Plugin.Enabled.Value || !Plugin.HoldReloadShowAll.Value || MainPlayer.InventoryIfMine(controller) == null)
             {
                 return false;
             }
@@ -87,6 +94,7 @@ namespace InfiniteEverything.Patches
             {
                 Prefs.Clear();
                 VirtualItems.Clear();
+                RaidEnding = false;
             }
         }
 
@@ -175,6 +183,13 @@ namespace InfiniteEverything.Patches
         private static bool Fits(Slot slot, Magazine magazine)
         {
             if (!slot.CheckCompatibility(magazine) || slot.CheckConflictingItems(magazine).Failed)
+            {
+                return false;
+            }
+
+            // Raid only (Mod.CanBeMoved): a magazine that is not raid-moddable, or a slot that is "required"
+            // (an SKS or Mosin without its magazine), cannot be changed in a raid.
+            if (magazine.CanBeMoved(slot).Failed)
             {
                 return false;
             }
@@ -454,6 +469,12 @@ namespace InfiniteEverything.Patches
         /// </summary>
         internal static bool Park(InventoryController inventory, Magazine magazine)
         {
+            if (HoldReload.RaidEnding)
+            {
+                return false;
+            }
+
+            NotLoot.Mark(inventory, magazine); // with the rounds in it
             ItemAddress spot = (ItemAddress)ReloadKeepMagazinePatch.FindSpot(inventory, magazine, backpack: false)
                                ?? ReloadKeepMagazinePatch.FindSpot(inventory, magazine, backpack: true);
             if (spot != null)
@@ -647,6 +668,36 @@ namespace InfiniteEverything.Patches
             return null;
         }
 
+        /// <summary>Raid end: every free place for a kept magazine, best first (rig and pockets, backpack, any other worn container).</summary>
+        private static List<ItemAddress> FreeSpots(InventoryController inventory, Magazine magazine)
+        {
+            var spots = new List<ItemAddress>();
+            ItemAddress first = FreeSpot(inventory, magazine, anywhere: false);
+            if (first != null)
+            {
+                spots.Add(first);
+            }
+
+            foreach (Slot slot in inventory.Inventory.Equipment.GetAllSlots())
+            {
+                if (!(slot.ContainedItem is CompoundItem box) || box is Weapon || box.Grids == null)
+                {
+                    continue;
+                }
+
+                foreach (var grid in box.Grids)
+                {
+                    ItemAddress address = grid.FindLocationForItem(magazine);
+                    if (address != null)
+                    {
+                        spots.Add(address);
+                    }
+                }
+            }
+
+            return spots;
+        }
+
         /// <summary>
         /// Called every frame. Returns every borrowed magazine that is out of a gun once the hands are idle (the unload
         /// key, dragged out by hand, or picked and never loaded: after 5 seconds), forgets the ones a reload ended, and
@@ -667,7 +718,10 @@ namespace InfiniteEverything.Patches
                 return;
             }
 
-            bool idle = HoldReload.HandsIdle(player);
+            // Idle hands are not enough: an inventory operation (the unload key, a throw, a drag) can still be running
+            // with the hands already idle, and changing the gun's slot under it left that operation stuck ("hands
+            // busy", seen in the 2.5.1 raid test).
+            bool idle = HoldReload.HandsIdle(player) && !player.InventoryController.HasActiveEvents;
             foreach (Entry entry in Entries.Values.ToList())
             {
                 try
@@ -678,6 +732,7 @@ namespace InfiniteEverything.Patches
                         if (idle)
                         {
                             Entries.Remove(magazine.Id); // a reload took it out (BeforeReload): it has ended
+                            NotLoot.Forget(magazine);
                         }
 
                         continue;
@@ -709,7 +764,7 @@ namespace InfiniteEverything.Patches
                 }
                 catch (Exception ex)
                 {
-                    Entries.Remove(entry.Magazine.Id);
+                    entry.NotBefore = Time.unscaledTime + 5f; // it stays tracked, so raid end still removes it
                     Plugin.Log.LogError($"Borrowed magazine cleanup failed: {ex}");
                 }
             }
@@ -743,8 +798,10 @@ namespace InfiniteEverything.Patches
 
                     // The borrowed magazine is out of the gun (unloaded), or the gun left the inventory: back to a free
                     // spot, else into the gun's empty slot, else wait for room.
+                    // Never straight into the slot of the gun in the hands: the gun's model would not show it. That gun
+                    // waits for a free spot (or raid end, which puts it back in the gun).
                     ItemAddress spot = FreeSpot(kept.Inventory, kept.Magazine, anywhere: false);
-                    if (spot == null && gunMine && slot != null && slot.ContainedItem == null)
+                    if (spot == null && gunMine && slot != null && slot.ContainedItem == null && !MainPlayer.InHands(kept.Gun))
                     {
                         spot = slot.CreateItemAddress();
                     }
@@ -776,6 +833,7 @@ namespace InfiniteEverything.Patches
                     Magazine magazine = entry.Magazine;
                     if (!ReferenceEquals(magazine.Owner, entry.Inventory) || magazine.CurrentAddress == null)
                     {
+                        NotLoot.Forget(magazine);
                         continue; // not in the inventory (dropped in the world): not part of the profile
                     }
 
@@ -825,8 +883,16 @@ namespace InfiniteEverything.Patches
 
                     if (!back)
                     {
-                        ItemAddress spot = FreeSpot(kept.Inventory, kept.Magazine, anywhere: true);
-                        back = spot != null && PutBack(kept, spot, force: false);
+                        // Every free place in turn, and a refusal is overridden: this is the player's own magazine
+                        // and the profile is about to be saved.
+                        foreach (ItemAddress spot in FreeSpots(kept.Inventory, kept.Magazine))
+                        {
+                            if (PutBack(kept, spot, force: true))
+                            {
+                                back = true;
+                                break;
+                            }
+                        }
                     }
 
                     if (back)
@@ -869,6 +935,7 @@ namespace InfiniteEverything.Patches
 
             result.Value.RaiseEvents(entry.Inventory, CommandStatus.Begin);
             result.Value.RaiseEvents(entry.Inventory, CommandStatus.Succeed);
+            NotLoot.Forget(entry.Magazine);
             Plugin.Log.LogInfo($"Borrowed magazine {entry.Magazine.StringTemplateId} returned (removed).");
             return true;
         }
@@ -1049,6 +1116,18 @@ namespace InfiniteEverything.Patches
 
                 if (item is Magazine magazine)
                 {
+                    // The game's SwitchMagazine has silent exits (the move check, blind fire, an interaction playing).
+                    // From idle the swap happens inside the call, so a borrowed magazine that is not in the gun now
+                    // was refused: it goes again at once instead of sitting in the rig, and the pick is not remembered.
+                    Player player = __instance.Player;
+                    if (Borrowed.Contains(magazine) && !ReferenceEquals(weapon.GetCurrentMagazine(), magazine) && player != null && HoldReload.HandsIdle(player))
+                    {
+                        Borrowed.Cancel(magazine);
+                        Plugin.Log.LogWarning($"Hold-R: the game refused {magazine.StringTemplateId}; nothing was changed.");
+                        Plugin.Notify("Infinite ammo: that magazine could not be loaded");
+                        return;
+                    }
+
                     Prefs.SetMagazine(weapon, magazine);
                 }
                 else if (item is Ammo && !weapon.IsUnderBarrelDeviceActive)
@@ -1063,7 +1142,56 @@ namespace InfiniteEverything.Patches
         }
     }
 
-    /// <summary>Raid end (LocalGame.Stop calls this before the profile is sent): borrowed magazines go back, choices are forgotten.</summary>
+    /// <summary>
+    /// "Unload" on a gun that holds a borrowed magazine (ItemUiContext.UnloadWeapon, the only caller is the item menu
+    /// and its hotkey). The game moves the magazine to a free place and, in a raid with no free place, throws it on
+    /// the ground. A borrowed magazine on the ground is a free magazine, and the player's own one then had nowhere to
+    /// go but the gun's slot. With a free place the unload runs as usual (Borrowed.Tick then ends the borrowed magazine
+    /// and brings the kept one back); without one it is refused with a notice.
+    /// </summary>
+    public class UnloadBorrowedPatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return AccessTools.Method(typeof(ItemUiContext), nameof(ItemUiContext.UnloadWeapon));
+        }
+
+        [PatchPrefix]
+        private static bool Prefix(Weapon weapon, ref System.Threading.Tasks.Task __result)
+        {
+            try
+            {
+                Magazine magazine = weapon?.GetCurrentMagazine();
+                InventoryController inventory = MainPlayer.Get()?.InventoryController;
+                if (magazine == null || inventory == null || !Borrowed.Contains(magazine))
+                {
+                    return true;
+                }
+
+                if (ReloadKeepMagazinePatch.FindSpot(inventory, magazine, backpack: false) != null
+                    || ReloadKeepMagazinePatch.FindSpot(inventory, magazine, backpack: true) != null)
+                {
+                    return true;
+                }
+
+                Plugin.Log.LogInfo($"Unload refused: no free space for the borrowed magazine {magazine.StringTemplateId}.");
+                Plugin.Notify("Infinite ammo: no free space to unload a borrowed magazine");
+                __result = System.Threading.Tasks.Task.CompletedTask;
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogError($"{nameof(UnloadBorrowedPatch)}: {ex}");
+                return true;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Raid end, first half: BaseLocalGame.Stop (extract, death, MIA, leave, transit). Borrowed magazines and temporary
+    /// rounds go, kept magazines come back, choices are forgotten, and nothing new is borrowed from here on
+    /// (HoldReload.RaidEnding). Stop only starts the fade to black; see <see cref="RaidSavePatch"/> for the second half.
+    /// </summary>
     public class RaidEndPatch : ModulePatch
     {
         protected override MethodBase GetTargetMethod()
@@ -1082,13 +1210,54 @@ namespace InfiniteEverything.Patches
                     return;
                 }
 
-                Borrowed.RaidEnd();
-                Prefs.Clear();
-                VirtualItems.Clear();
+                HoldReload.RaidEnding = true;
+                CleanUp();
             }
             catch (Exception ex)
             {
                 Plugin.Log.LogError($"{nameof(RaidEndPatch)}: {ex}");
+            }
+        }
+
+        internal static void CleanUp()
+        {
+            KnownForReload.Clear();
+            TempRounds.RaidEnd();
+            Borrowed.RaidEnd();
+            Prefs.Clear();
+            VirtualItems.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Raid end, second half: BaseLocalGame.GameEnd runs when the fade is over and serializes the profile a few lines
+    /// later. The same clean-up again, for anything a reload that was still running during the fade left behind (a
+    /// kept magazine only exists in Borrowed.Held until it is put back).
+    /// </summary>
+    public class RaidSavePatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return AccessTools.Method(typeof(BaseLocalGame<EftGamePlayerOwner>), nameof(BaseLocalGame<EftGamePlayerOwner>.GameEnd));
+        }
+
+        [PatchPrefix]
+        private static void Prefix(string profileId)
+        {
+            try
+            {
+                Player player = MainPlayer.Get();
+                if (player == null || player.ProfileId != profileId)
+                {
+                    return;
+                }
+
+                HoldReload.RaidEnding = true;
+                RaidEndPatch.CleanUp();
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogError($"{nameof(RaidSavePatch)}: {ex}");
             }
         }
     }
@@ -1135,7 +1304,7 @@ namespace InfiniteEverything.Patches
                 return false;
             }
 
-            inventory.AddAndRaiseEvents(rocket, weapon.Chambers[0].CreateItemAddress());
+            NotLoot.Add(inventory, rocket, weapon.Chambers[0].CreateItemAddress());
             if (rocket.CurrentAddress == null)
             {
                 return false;

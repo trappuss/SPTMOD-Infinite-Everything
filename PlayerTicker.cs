@@ -28,6 +28,7 @@ namespace InfiniteEverything
 
         private static Player _player;
         private static bool _godApplied;
+        private static bool _fedApplied;
         private static float _savedDamageCoeff = 1f;
         private static float _nextHealthTick;
         private static float _nextFeedTick;
@@ -59,6 +60,7 @@ namespace InfiniteEverything
             {
                 _player = player;
                 _godApplied = false; // a new raid: a new health controller
+                _fedApplied = false;
             }
 
             if (player == null)
@@ -137,10 +139,23 @@ namespace InfiniteEverything
                 {
                     health.SetDamageCoeff(_savedDamageCoeff);
                     _godApplied = false;
+
+                    // Entering the BTR with god mode on makes the game remember "was invincible before"
+                    // (LocalPlayer.IgnoreDamage) and never forget it: the next ride would leave the player
+                    // invincible with the option off.
+                    if (player is LocalPlayer local)
+                    {
+                        HarmonyLib.AccessTools.Field(typeof(LocalPlayer), "_wasInvincibleBefore")?.SetValue(local, false);
+                    }
+
                     Plugin.Log.LogInfo($"Infinite health off (damage coefficient back to {_savedDamageCoeff}).");
                 }
 
-                if (Plugin.On(Plugin.InfiniteEnergyHydration))
+                // The drain itself is stopped by EnergyHydrationPatch. Refilling every tick, as before 2.5.1, paid
+                // raid experience and Metabolism skill for every refill (the game rewards each rise). Only what is
+                // missing when the option is switched on is filled, once.
+                bool fed = Plugin.On(Plugin.InfiniteEnergyHydration);
+                if (fed && !_fedApplied)
                 {
                     ValueStruct energy = health.Energy;
                     if (energy.Current < energy.Maximum - 0.01f)
@@ -154,6 +169,8 @@ namespace InfiniteEverything
                         health.ChangeHydration(hydration.Maximum - hydration.Current);
                     }
                 }
+
+                _fedApplied = fed;
             }
             catch (System.Exception ex)
             {

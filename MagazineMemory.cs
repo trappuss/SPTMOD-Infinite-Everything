@@ -146,7 +146,7 @@ namespace InfiniteEverything
                     }
 
                     int before = cartridges.Count;
-                    owner.AddAndRaiseEvents(ammo, cartridges.CreateItemAddress());
+                    NotLoot.Add(owner, ammo, cartridges.CreateItemAddress());
                     if (cartridges.Count <= before)
                     {
                         Plugin.Log.LogWarning($"Refill: adding {count} x {stack.Tpl} to {magazine} failed (see the error above); stopped.");

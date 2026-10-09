@@ -35,6 +35,48 @@ namespace InfiniteEverything.Patches
     }
 
     /// <summary>
+    /// Infinite energy and hydration: every loss is cancelled where it is applied (ActiveHealthController.ChangeEnergy;
+    /// the regular drain, exhaustion, stimulant side effects all go through it), for the local player only. Gains
+    /// from food and drink are untouched. Before 2.5.1 the drain was left alone and refilled four times a second, and
+    /// the game pays raid experience and Metabolism skill for every rise (HealthStatisticsManager.OnEnergyChanged,
+    /// Player.Skills.EnergyChanged): about 6 experience a minute for doing nothing.
+    /// </summary>
+    public class EnergyDrainPatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return AccessTools.Method(typeof(ActiveHealthController), nameof(ActiveHealthController.ChangeEnergy));
+        }
+
+        [PatchPrefix]
+        private static void Prefix(ActiveHealthController __instance, ref float value)
+        {
+            if (value < 0f && Plugin.On(Plugin.InfiniteEnergyHydration) && __instance.Player != null && __instance.Player.IsYourPlayer)
+            {
+                value = 0f;
+            }
+        }
+    }
+
+    /// <summary>The hydration half of <see cref="EnergyDrainPatch"/> (ActiveHealthController.ChangeHydration).</summary>
+    public class HydrationDrainPatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return AccessTools.Method(typeof(ActiveHealthController), nameof(ActiveHealthController.ChangeHydration));
+        }
+
+        [PatchPrefix]
+        private static void Prefix(ActiveHealthController __instance, ref float value)
+        {
+            if (value < 0f && Plugin.On(Plugin.InfiniteEnergyHydration) && __instance.Player != null && __instance.Player.IsYourPlayer)
+            {
+                value = 0f;
+            }
+        }
+    }
+
+    /// <summary>
     /// Infinite stamina. Stamina.Process (every frame, from Physical.Update) and Stamina.Consume (jumps, vaults,
     /// throws, hits...) are the only places Current goes down. After either, the local player's body stamina, arm
     /// stamina and breath (PlayerTicker publishes those three objects) are set back to full.
